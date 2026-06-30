@@ -1,0 +1,26 @@
+ACCOUNTNBR,ACCOUNTSTARTDATE,TOTALAMOUNT,STATUS,CUSTOMERNBR,FULLNAME,EMAIL,STREET,HOUSENO,CITY,COUNTRY,CUSTOMERTYPE
+ACT001,15/01/2020,15000.00,ACTIVE,CIN10001,James Harrison,james.harrison@email.com,Kurfürstendamm,42,Berlin,Germany,RETAIL
+ACT002,22/06/2019,32500.50,ACTIVE,CIN10002,Sofia Müller,sofia.mueller@email.de,Hauptstraße,17,Berlin,Germany,PREMIUM
+ACT003,08/03/2021,8750.25,INACTIVE,CIN10003,Raj Patel,raj.patel@email.in,Rue de Rivoli,8B,Paris,France,RETAIL
+ACT004,30/11/2018,125000.00,ACTIVE,CIN10004,Amelia Chen,amelia.chen@email.sg,Via Roma,101,Rome,Italy,CORPORATE
+ACT005,14/07/2022,450.75,ACTIVE,CIN10005,Luca Rossi,luca.rossi@email.it,Via Veneto,5,Rome,Italy,RETAIL
+ACT006,01/04/2017,55000.00,INACTIVE,CIN10006,Fatima Al-Rashidi,fatima.r@email.sa,Calle de Alcalá,223,Madrid,Spain,PREMIUM
+ACT007,19/01/2023,9999.99,ACTIVE,CIN10007,Noah Williams,noah.williams@email.com,Herengracht,7,Amsterdam,Netherlands,RETAIL
+ACT008,05/09/2020,2300.00,ACTIVE,CIN10008,Priya Sharma,priya.sharma@email.in,Nowy Świat,19,Warsaw,Poland,RETAIL
+ACT009,25/12/2016,78000.00,CLOSED,CIN10009,Ethan Johnson,ethan.j@email.ca,Drottninggatan,33,Stockholm,Sweden,PREMIUM
+ACT010,18/08/2021,13450.00,ACTIVE,CIN10010,Mei Zhang,mei.zhang@email.cn,Rue Neuve,88,Brussels,Belgium,CORPORATE
+ACT011,28/02/2022,500.00,ACTIVE,CIN10011,Carlos Mendoza,carlos.m@email.mx,Mariahilfer Straße,456,Vienna,Austria,RETAIL
+ACT012,11/05/2019,41200.80,ACTIVE,CIN10012,Aisha Okonkwo,aisha.o@email.ng,Avenida da Liberdade,12,Lisbon,Portugal,RETAIL
+ACT013,30/06/2023,300.00,INACTIVE,CIN10013,Henrik Larsson,henrik.l@email.se,Storgatan,3,Stockholm,Sweden,RETAIL
+ACT014,10/10/2015,250000.00,ACTIVE,CIN10014,Emily Thompson,emily.t@email.co.uk,Graben,221B,Vienna,Austria,CORPORATE
+ACT015,22/03/2020,6800.00,ACTIVE,CIN10015,Arjun Nair,arjun.nair@email.in,Strada Unirii,14C,Bucharest,Romania,RETAIL
+ACT016,07/07/2018,17500.50,ACTIVE,CIN10016,Yuki Tanaka,yuki.t@email.jp,Wenceslas Square,99,Prague,Czech Republic,PREMIUM
+ACT017,01/01/2024,100.00,ACTIVE,CIN10017,Olivia Brown,olivia.b@email.com,Ermou Street,1000,Athens,Greece,RETAIL
+ACT018,15/11/2021,34900.00,ACTIVE,CIN10018,Marco Ferrari,marco.f@email.it,Corso Vittorio,27,Milan,Italy,PREMIUM
+ACT019,09/09/2017,62000.00,ACTIVE,CIN10019,Zanele Dlamini,zanele.d@email.za,Marszałkowska,55,Warsaw,Poland,CORPORATE
+ACT020,01/12/2022,5555.55,INACTIVE,CIN10020,Ivan Petrov,ivan.p@email.ru,Váci Street,78,Budapest,Hungary,RETAIL
+ACT021,20/08/2023,89000.00,ACTIVE,CIN10021,Hannah Schmidt,hannah.s@email.de,Ludwigstraße,200,Munich,Germany,PREMIUM
+ACT022,14/02/2019,3200.00,ACTIVE,CIN10022,Omar Hassan,omar.h@email.eg,O'Connell Street,6,Dublin,Ireland,RETAIL
+ACT023,06/06/2020,47800.25,ACTIVE,CIN10023,Chloe Martin,chloe.m@email.fr,Champs-Élysées,45,Paris,France,PREMIUM
+ACT024,31/03/2016,11000.00,INACTIVE,CIN10024,Kwame Asante,kwame.a@email.gh,Avenue Louise,30,Brussels,Belgium,RETAIL
+ACT026,10/03/2025,18500.00,ACTIVE,CIN10026,Diana Flores,diana.f@email.mx,Reforma Avenue,77,Guadalajara,Mexico,RETAIL

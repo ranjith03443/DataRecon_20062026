@@ -1,0 +1,37 @@
+app_name: semantic-intelligence-platform
+version: "1.0.0"
+environment: dev
+description: "Enterprise-grade Semantic Intelligence Microservice for Metadata-Driven Reconciliation"
+
+features:
+  enable_rag: false
+  enable_semantic_cache: false
+  enable_ai_mapping: true
+  enable_audit_logging: true
+  enable_token_governance: true
+  enable_prompt_versioning: true
+
+server:
+  host: "0.0.0.0"
+  port: 8000
+  reload: false
+  workers: 1
+
+api:
+  prefix: "/api"
+  title: "Semantic Intelligence Platform API"
+  version: "v1"
+  cors_origins:
+    - "*"
+
+performance:
+  max_concurrent_requests: 100
+  request_timeout_seconds: 120
+  embedding_batch_size: 50
+
+ai_governance:
+  high_confidence_threshold: 0.90
+  medium_confidence_threshold: 0.70
+  low_confidence_threshold: 0.50
+  cache_only_high_confidence: true
+  advisory_mode: true

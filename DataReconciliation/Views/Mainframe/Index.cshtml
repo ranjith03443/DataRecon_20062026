@@ -1,0 +1,937 @@
+﻿@model DataReconciliation.Application.DTOs.MainframeArtifactPageDto
+
+@{
+    ViewData["Title"] = "Mainframe Development Centre";
+    var assetModel = Model.AssetPageModel ?? new DataReconciliation.Application.DTOs.MainframeAssetPageDto { JobId = Model.JobId };
+    var ar = assetModel.AssetResult;
+    var activeTab = "tab-artifacts";
+    if (TempData["AssetSuccess"] != null || TempData["AssetError"] != null || ar != null)
+        activeTab = "tab-assets";
+}
+
+@* â”€â”€ Page header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ *@
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-1"><i class="fas fa-terminal me-2 text-primary"></i>Mainframe Development Centre</h2>
+        <p class="text-muted mb-0">Generate artifacts, build mainframe assets, and get AI-powered development guidance - all from a single job.</p>
+    </div>
+</div>
+
+@* â”€â”€ Global alerts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ *@
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show">
+        <i class="fas fa-check-circle me-2"></i>@TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show">
+        <i class="fas fa-exclamation-triangle me-2"></i>@TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["AssetSuccess"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show">
+        <i class="fas fa-robot me-2"></i>@TempData["AssetSuccess"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["AssetError"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show">
+        <i class="fas fa-exclamation-triangle me-2"></i>@TempData["AssetError"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@* â”€â”€ Shared Job ID context banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ *@
+<div class="card mb-3 border-0 bg-light">
+    <div class="card-body py-2 px-3 d-flex align-items-center gap-3 flex-wrap">
+        <i class="fas fa-briefcase text-secondary"></i>
+        <span class="text-muted small fw-semibold">Active Job</span>
+        <code id="sharedJobIdDisplay" class="fs-6">
+            @(Model.Result?.JobId ?? assetModel?.AssetResult?.JobId ?? Model.JobId ?? "-")
+        </code>
+        @{
+            var hasJob = !string.IsNullOrWhiteSpace(Model.Result?.JobId ?? assetModel?.AssetResult?.JobId ?? Model.JobId);
+        }
+        @if (hasJob)
+        {
+            <span class="badge bg-success"><i class="fas fa-circle-check me-1"></i>Job loaded</span>
+        }
+        else
+        {
+            <span class="badge bg-secondary">Enter a Job ID in any tab below</span>
+        }
+    </div>
+</div>
+
+@* â”€â”€ Main tab navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ *@
+<ul class="nav nav-tabs nav-fill mb-0" id="mainTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link @(activeTab == "tab-artifacts" ? "active" : "")"
+                id="btn-tab-artifacts" data-bs-toggle="tab" data-bs-target="#tab-artifacts"
+                type="button" role="tab">
+            <i class="fas fa-file-code me-2 text-primary"></i>
+            <span class="fw-semibold">Mainframe Artifacts</span>
+            <br /><small class="fw-normal text-muted">Copybook | Spec | JSON</small>
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link @(activeTab == "tab-assets" ? "active" : "")"
+                id="btn-tab-assets" data-bs-toggle="tab" data-bs-target="#tab-assets"
+                type="button" role="tab">
+            <i class="fas fa-layer-group me-2 text-info"></i>
+            <span class="fw-semibold">Mainframe Assets</span>
+            <br /><small class="fw-normal text-muted">COBOL | JCL | Samples</small>
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link"
+                id="btn-tab-agent" data-bs-toggle="tab" data-bs-target="#tab-agent"
+                type="button" role="tab">
+            <i class="fas fa-brain me-2 text-warning"></i>
+            <span class="fw-semibold">AI Development Agent</span>
+            <br /><small class="fw-normal text-muted">Explain | Review | Enhance | Document</small>
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content border border-top-0 rounded-bottom bg-white shadow-sm" id="mainTabContent">
+
+    @* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+       TAB 1 â€” MAINFRAME ARTIFACTS (deterministic: copybook, spec, JSON)
+       â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• *@
+    <div class="tab-pane fade @(activeTab == "tab-artifacts" ? "show active" : "")"
+         id="tab-artifacts" role="tabpanel">
+        <div class="p-4">
+            <div class="row g-4">
+                <div class="col-lg-3">
+                    <h6 class="text-primary fw-semibold mb-2"><i class="fas fa-info-circle me-1"></i>What it generates</h6>
+                    <ul class="list-unstyled small text-muted mb-3">
+                        <li class="mb-1"><i class="fas fa-file-code text-success me-2"></i>Copybook <code>.cpy</code></li>
+                        <li class="mb-1"><i class="fas fa-file-lines text-secondary me-2"></i>Specification <code>.txt</code></li>
+                        <li class="mb-1"><i class="fas fa-file-alt text-warning me-2"></i>Summary manifest <code>.json</code></li>
+                    </ul>
+                    <p class="small text-muted mb-0">
+                        <i class="fas fa-gears me-1"></i><strong>Deterministic.</strong> Reads target schema only. No AI involved.
+                    </p>
+                </div>
+                <div class="col-lg-9">
+                    <form asp-action="Generate" method="post">
+                        @Html.AntiForgeryToken()
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label asp-for="JobId" class="form-label fw-semibold">Job ID</label>
+                                <input asp-for="JobId" class="form-control job-id-input" placeholder="JOB_20260527071213_96B921" />
+                                <span asp-validation-for="JobId" class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-4">
+                                <label asp-for="Request.RecordName" class="form-label fw-semibold">Record name</label>
+                                <input asp-for="Request.RecordName" class="form-control" placeholder="CUSTOMER_MASTER" />
+                            </div>
+                            <div class="col-md-4">
+                                <label asp-for="Request.ApplicationName" class="form-label fw-semibold">Application name</label>
+                                <input asp-for="Request.ApplicationName" class="form-control" placeholder="MAINFRAME_APP" />
+                            </div>
+                        </div>
+                        <div class="form-check form-switch my-3">
+                            <input asp-for="Request.IncludeComments" class="form-check-input" />
+                            <label asp-for="Request.IncludeComments" class="form-check-label">Include comments in artifacts</label>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-gears me-2"></i>Generate Mainframe Artifacts
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            @if (Model.Result != null)
+            {
+                <hr class="my-4" />
+                <div class="mb-3">
+                    <h5 class="mb-0"><i class="fas fa-check-circle text-success me-2"></i>Generated Artifacts</h5>
+                    <small class="text-muted">
+                        Job: <strong>@Model.Result.JobId</strong> |
+                        Record: <strong>@Model.Result.RecordName</strong> Â·
+                        @Model.Result.Fields.Count fields Â·
+                        @Model.Result.GeneratedAt.ToString("yyyy-MM-dd HH:mm") UTC
+                    </small>
+                </div>
+                <div class="d-flex gap-2 flex-wrap mb-4">
+                    <a class="btn btn-success"
+                       asp-action="Download" asp-route-jobId="@Model.Result.JobId"
+                       asp-route-fileName="@Model.Result.CopybookFileName">
+                        <i class="fas fa-download me-2"></i>Copybook (.cpy)
+                    </a>
+                    <a class="btn btn-outline-success"
+                       asp-action="Download" asp-route-jobId="@Model.Result.JobId"
+                       asp-route-fileName="@Model.Result.SpecificationFileName">
+                        <i class="fas fa-download me-2"></i>Specification (.txt)
+                    </a>
+                    <a class="btn btn-outline-secondary"
+                       asp-action="Download" asp-route-jobId="@Model.Result.JobId"
+                       asp-route-fileName="@Model.Result.SummaryFileName">
+                        <i class="fas fa-download me-2"></i>Summary (.json)
+                    </a>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th><th>Field</th><th>Data Type</th>
+                                <th>Length</th><th>Picture</th><th>Source Field</th><th>Justification</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var field in Model.Result.Fields.OrderBy(f => f.ColumnOrder))
+                            {
+                                <tr>
+                                    <td class="text-muted">@(field.ColumnOrder + 1)</td>
+                                    <td><code>@field.FieldName</code></td>
+                                    <td>@field.DataType</td>
+                                    <td>@(field.Length?.ToString() ?? "-")</td>
+                                    <td><code>@field.PictureClause</code></td>
+                                    <td>@(field.SourceField ?? "-")</td>
+                                    <td>@field.Justification</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+    @* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+       TAB 2 â€” MAINFRAME ASSETS (deterministic: COBOL, JCL, samples)
+       â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• *@
+    <div class="tab-pane fade @(activeTab == "tab-assets" ? "show active" : "")"
+         id="tab-assets" role="tabpanel">
+        <div class="p-4">
+            <div class="row g-4">
+                <div class="col-lg-3">
+                    <h6 class="text-info fw-semibold mb-2"><i class="fas fa-info-circle me-1"></i>What it generates</h6>
+                    <ul class="list-unstyled small text-muted mb-3">
+                        <li class="mb-1"><i class="fas fa-file-code text-success me-2"></i>Copybook <code>.cpy</code></li>
+                        <li class="mb-1"><i class="fas fa-code text-success me-2"></i>COBOL <code>.cbl</code></li>
+                        <li class="mb-1"><i class="fas fa-server text-primary me-2"></i>JCL <code>.jcl</code></li>
+                        <li class="mb-1"><i class="fas fa-file-lines text-secondary me-2"></i>Technical spec <code>.txt</code></li>
+                        <li class="mb-1"><i class="fas fa-database text-info me-2"></i>Sample records <code>.dat</code></li>
+                    </ul>
+                    <p class="small text-muted mb-2">
+                        <i class="fas fa-gears me-1"></i><strong>Deterministic.</strong> Reads schema, mappings and value mappings. No AI involved.
+                    </p>
+                    <span class="badge bg-warning text-dark small">
+                        <i class="fas fa-triangle-exclamation me-1"></i>COBOL &amp; JCL - Review Required
+                    </span>
+                </div>
+                <div class="col-lg-9">
+                    <form asp-action="GenerateAssets" method="post">
+                        @Html.AntiForgeryToken()
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Job ID</label>
+                                <input name="JobId" id="assetJobId" class="form-control job-id-input"
+                                       value="@(Model.Result?.JobId ?? Model.JobId)"
+                                       placeholder="JOB_20260527071213_96B921" required />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Record Name</label>
+                                <input name="Request.RecordName" class="form-control"
+                                       value="@(ar?.RecordName ?? Model.Result?.RecordName ?? "CUSTOMER_MASTER")" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Application Name</label>
+                                <input name="Request.ApplicationName" class="form-control"
+                                       value="@(ar?.ApplicationName ?? Model.Result?.ApplicationName ?? "MAINFRAME_APP")" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold">Program Name <small class="text-muted">(max 8)</small></label>
+                                <input name="Request.ProgramName" class="form-control"
+                                       value="@(ar?.ProgramName ?? "CUSTMSTR")" maxlength="8" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold">Job Name <small class="text-muted">(max 8)</small></label>
+                                <input name="Request.JobName" class="form-control"
+                                       value="@(ar?.JobName ?? "CUSTLOAD")" maxlength="8" />
+                            </div>
+                        </div>
+                        <h6 class="fw-semibold text-muted mb-2">Select outputs</h6>
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="Request.GenerateCopybook" value="true" checked id="chkCopybook" />
+                                    <input type="hidden" name="Request.GenerateCopybook" value="false" />
+                                    <label class="form-check-label small" for="chkCopybook"><i class="fas fa-file-code text-success me-1"></i>Copybook (.cpy)</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="Request.GenerateCobolSkeleton" value="true" checked id="chkCobol" />
+                                    <input type="hidden" name="Request.GenerateCobolSkeleton" value="false" />
+                                    <label class="form-check-label small" for="chkCobol"><i class="fas fa-code text-success me-1"></i>COBOL (.cbl)</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="Request.GenerateJclSkeleton" value="true" checked id="chkJcl" />
+                                    <input type="hidden" name="Request.GenerateJclSkeleton" value="false" />
+                                    <label class="form-check-label small" for="chkJcl"><i class="fas fa-server text-primary me-1"></i>JCL (.jcl)</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="Request.GenerateTechnicalSpec" value="true" checked id="chkSpec" />
+                                    <input type="hidden" name="Request.GenerateTechnicalSpec" value="false" />
+                                    <label class="form-check-label small" for="chkSpec"><i class="fas fa-file-lines text-secondary me-1"></i>Technical Spec (.txt)</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="Request.GenerateSampleRecords" value="true" checked id="chkSamples" />
+                                    <input type="hidden" name="Request.GenerateSampleRecords" value="false" />
+                                    <label class="form-check-label small" for="chkSamples"><i class="fas fa-database text-info me-1"></i>Sample Records (.dat)</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small mb-0 text-muted">Sample record count</label>
+                                <select name="Request.SampleRecordCount" class="form-select form-select-sm">
+                                    <option value="10" selected>10</option>
+                                    <option value="20">20</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-info text-white">
+                            <i class="fas fa-layer-group me-2"></i>Generate Mainframe Assets
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            @if (ar != null)
+            {
+                <hr class="my-4" />
+                <div class="mb-3">
+                    <h5 class="mb-0"><i class="fas fa-check-circle text-success me-2"></i>Generated Assets</h5>
+                    <small class="text-muted">
+                        Job: <strong>@ar.JobId</strong> |
+                        Record: <strong>@ar.RecordName</strong> |
+                        Program: <strong>@ar.ProgramName</strong> |
+                        @ar.Fields.Count fields | @ar.TotalRecordLength bytes |
+                        @ar.GeneratedAt.ToString("yyyy-MM-dd HH:mm") UTC
+                    </small>
+                </div>
+                <div class="alert alert-warning py-2 mb-3 d-flex align-items-center gap-2">
+                    <i class="fas fa-triangle-exclamation flex-shrink-0"></i>
+                    <span>Please review the generated COBOL and JCL files before executing.</span>
+                </div>
+                <div class="d-flex gap-2 flex-wrap mb-4">
+                    @if (ar.CopybookFileName != null)
+                    {
+                        <a class="btn btn-success btn-sm"
+                           asp-action="DownloadAsset" asp-route-jobId="@ar.JobId" asp-route-fileName="@ar.CopybookFileName">
+                            <i class="fas fa-download me-1"></i>Copybook (.cpy)
+                        </a>
+                    }
+                    @if (ar.CobolSkeletonFileName != null)
+                    {
+                        <a class="btn btn-outline-success btn-sm"
+                           asp-action="DownloadAsset" asp-route-jobId="@ar.JobId" asp-route-fileName="@ar.CobolSkeletonFileName">
+                            <i class="fas fa-download me-1"></i>COBOL (.cbl)
+                        </a>
+                    }
+                    @if (ar.JclSkeletonFileName != null)
+                    {
+                        <a class="btn btn-outline-primary btn-sm"
+                           asp-action="DownloadAsset" asp-route-jobId="@ar.JobId" asp-route-fileName="@ar.JclSkeletonFileName">
+                            <i class="fas fa-download me-1"></i>JCL (.jcl)
+                        </a>
+                    }
+                    @if (ar.TechnicalSpecFileName != null)
+                    {
+                        <a class="btn btn-outline-secondary btn-sm"
+                           asp-action="DownloadAsset" asp-route-jobId="@ar.JobId" asp-route-fileName="@ar.TechnicalSpecFileName">
+                            <i class="fas fa-download me-1"></i>Technical Spec (.txt)
+                        </a>
+                    }
+                    @if (ar.SampleRecordsFileName != null)
+                    {
+                        <a class="btn btn-outline-info btn-sm"
+                           asp-action="DownloadAsset" asp-route-jobId="@ar.JobId" asp-route-fileName="@ar.SampleRecordsFileName">
+                            <i class="fas fa-download me-1"></i>Sample Records (.dat)
+                        </a>
+                    }
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th><th>Field Name</th><th>COBOL Name</th>
+                                <th>Type</th><th>Len</th><th>Start</th><th>PIC</th><th>Source Field</th><th>Req</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var f in ar.Fields.OrderBy(x => x.ColumnOrder))
+                            {
+                                <tr>
+                                    <td class="text-muted">@(f.ColumnOrder + 1)</td>
+                                    <td><code>@f.FieldName</code></td>
+                                    <td><code>@f.CobolFieldName</code></td>
+                                    <td><span class="badge bg-light text-dark border">@f.DataType</span></td>
+                                    <td>@(f.Length?.ToString() ?? "-")</td>
+                                    <td>@f.StartPosition</td>
+                                    <td><code>@f.PictureClause</code></td>
+                                    <td>@(f.SourceField ?? "-")</td>
+                                    <td>@(f.IsRequired ? "Y" : "")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+    @* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+       TAB 3 â€” AI DEVELOPMENT AGENT
+       â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• *@
+    <div class="tab-pane fade" id="tab-agent" role="tabpanel">
+        <div class="p-4">
+
+            <div class="row g-3 mb-4 align-items-end">
+                <div class="col-md-5">
+                    <label class="form-label fw-semibold">Job ID</label>
+                    <input type="text" id="aiAgentJobId" class="form-control job-id-input"
+                           placeholder="JOB_20260529_XXXXXX"
+                           value="@(Model.Result?.JobId ?? ar?.JobId ?? Model.JobId ?? "")" />
+                    <div class="form-text">The agent automatically loads COBOL, JCL, mappings and value mappings from this job.</div>
+                </div>
+                <div class="col-md-7">
+                    <div class="alert alert-warning mb-0 py-2 small">
+                        <i class="fas fa-triangle-exclamation me-1"></i>
+                        <strong>AI Generated Developer Guidance - Review Required</strong>
+                    </div>
+                </div>
+            </div>
+
+            @* Understanding group *@
+            <p class="text-muted small fw-semibold text-uppercase mb-2"><i class="fas fa-book me-1"></i>Understanding</p>
+            <div class="row g-2 mb-3">
+                <div class="col-6 col-md-2">
+                    <button class="btn btn-outline-primary w-100 agent-btn py-2" data-agent="explain">
+                        <i class="fas fa-book-open d-block mb-1 fs-5"></i>
+                        <span class="small fw-semibold">Explain COBOL</span>
+                    </button>
+                </div>
+                <div class="col-6 col-md-2">
+                    <button class="btn btn-outline-primary w-100 agent-btn py-2" data-agent="documentation">
+                        <i class="fas fa-file-word d-block mb-1 fs-5"></i>
+                        <span class="small fw-semibold">Developer Docs</span>
+                    </button>
+                </div>
+            </div>
+
+            @* Quality & Review group *@
+            <p class="text-muted small fw-semibold text-uppercase mb-2"><i class="fas fa-magnifying-glass me-1"></i>Quality &amp; Review</p>
+            <div class="row g-2 mb-3">
+                <div class="col-6 col-md-2">
+                    <button class="btn btn-outline-warning w-100 agent-btn py-2" data-agent="review">
+                        <i class="fas fa-magnifying-glass d-block mb-1 fs-5"></i>
+                        <span class="small fw-semibold">Review COBOL</span>
+                    </button>
+                </div>
+                <div class="col-6 col-md-2">
+                    <button class="btn btn-outline-warning w-100 agent-btn py-2" data-agent="jcl_improvements">
+                        <i class="fas fa-server d-block mb-1 fs-5"></i>
+                        <span class="small fw-semibold">JCL Improvements</span>
+                    </button>
+                </div>
+                <div class="col-6 col-md-2">
+                    <button class="btn btn-outline-warning w-100 agent-btn py-2" data-agent="optimization">
+                        <i class="fas fa-gauge-high d-block mb-1 fs-5"></i>
+                        <span class="small fw-semibold">Optimisation</span>
+                    </button>
+                </div>
+            </div>
+
+            @* Code Generation group *@
+            <p class="text-muted small fw-semibold text-uppercase mb-2"><i class="fas fa-wand-magic-sparkles me-1"></i>Code Generation</p>
+            <div class="row g-2 mb-4">
+                <div class="col-6 col-md-2">
+                    <button class="btn btn-outline-success w-100 agent-btn py-2" data-agent="enhance">
+                        <i class="fas fa-wand-magic-sparkles d-block mb-1 fs-5"></i>
+                        <span class="small fw-semibold">Enhance COBOL</span>
+                    </button>
+                </div>
+                <div class="col-6 col-md-2">
+                    <button class="btn btn-outline-success w-100 agent-btn py-2" data-agent="validation">
+                        <i class="fas fa-shield-check d-block mb-1 fs-5"></i>
+                        <span class="small fw-semibold">Validation Logic</span>
+                    </button>
+                </div>
+                <div class="col-6 col-md-2">
+                    <button class="btn btn-outline-success w-100 agent-btn py-2" data-agent="error_handling">
+                        <i class="fas fa-bug d-block mb-1 fs-5"></i>
+                        <span class="small fw-semibold">Error Handling</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="aiAgentSpinner" class="d-none text-center py-4">
+                <div class="spinner-border text-primary" role="status" style="width:2rem;height:2rem;"></div>
+                <p class="text-muted mt-2 mb-0">Running AI Agent - this may take 15-60 seconds...</p>
+            </div>
+
+            <div id="aiAgentError" class="d-none alert alert-danger alert-dismissible">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <span id="aiAgentErrorMsg"></span>
+                <button type="button" class="btn-close" onclick="document.getElementById('aiAgentError').classList.add('d-none')"></button>
+            </div>
+
+            <div id="aiAgentResult" class="d-none">
+                <hr />
+
+                @* ── Result header panel ─────────────────────────────────────── *@
+                <div id="aiResultHeader" class="rounded mb-3 p-3" style="background:#f8f9fa;border-left:4px solid #6c757d;">
+                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+                        <div class="flex-grow-1">
+                            <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                                <span class="fw-semibold fs-6" id="aiResultAgentName"></span>
+                                <span class="badge rounded-pill" id="aiConfidenceBadge" style="font-size:0.75rem;"></span>
+                            </div>
+                            <div class="d-flex align-items-center gap-3 flex-wrap">
+                                <span class="text-muted small"><i class="fas fa-briefcase me-1"></i><span id="aiResultJobId"></span></span>
+                                <span class="text-muted small"><i class="fas fa-clock me-1"></i><span id="aiResultTime"></span></span>
+                                <span class="text-muted small" id="aiResultTokens"></span>
+                            </div>
+                            @* Confidence progress bar *@
+                            <div class="mt-2" style="max-width:260px;">
+                                <div class="progress" style="height:5px;border-radius:3px;">
+                                    <div id="aiConfidenceBar" class="progress-bar" role="progressbar" style="width:0%;"></div>
+                                </div>
+                                <div class="d-flex justify-content-between mt-1">
+                                    <span class="text-muted" style="font-size:0.68rem;">Confidence</span>
+                                    <span id="aiConfidencePct" class="fw-semibold" style="font-size:0.68rem;"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="copyAiResult()">
+                                <i class="fas fa-copy me-1"></i>Copy
+                            </button>
+                            <button class="btn btn-sm btn-outline-dark" onclick="exportAiResultWord()">
+                                <i class="fas fa-file-word me-1"></i>Export .doc
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="window.print()">
+                                <i class="fas fa-print me-1"></i>Print / PDF
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                @* ── Result tabs ─────────────────────────────────────────────── *@
+                <ul class="nav nav-tabs" id="aiResultTabs">
+                    <li class="nav-item">
+                        <a class="nav-link active" id="tab-summary-lnk" data-bs-toggle="tab" href="#tab-summary">
+                            <i class="fas fa-file-lines me-1"></i>Summary
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="tab-code-lnk" data-bs-toggle="tab" href="#tab-code">
+                            <i class="fas fa-code me-1"></i>Generated Code
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="tab-recs-lnk" data-bs-toggle="tab" href="#tab-recs">
+                            <i class="fas fa-list-check me-1"></i>Recommendations
+                            <span id="tabRecsBadge" class="badge bg-secondary ms-1">0</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="tab-warn-lnk" data-bs-toggle="tab" href="#tab-warn">
+                            <i class="fas fa-triangle-exclamation me-1"></i>Warnings
+                            <span id="tabWarnBadge" class="badge bg-warning text-dark ms-1 d-none">!</span>
+                        </a>
+                    </li>
+                </ul>
+
+                <div class="tab-content border border-top-0 rounded-bottom bg-white">
+                    @* Summary tab — structured HTML sections replace the raw <pre> *@
+                    <div class="tab-pane fade show active p-3" id="tab-summary">
+                        <div id="aiSummaryContent"></div>
+                    </div>
+
+                    @* Generated Code tab *@
+                    <div class="tab-pane fade p-3" id="tab-code">
+                        <div class="position-relative">
+                            <button id="copyCodeBtn" class="btn btn-sm btn-outline-light position-absolute"
+                                    style="top:8px;right:8px;z-index:2;font-size:0.72rem;"
+                                    onclick="copyCodeContent(this)">
+                                <i class="fas fa-copy me-1"></i>Copy
+                            </button>
+                            <pre id="aiCodeContent" class="bg-dark text-light p-3 rounded mb-0"
+                                 style="font-size:0.78rem;max-height:560px;overflow-y:auto;white-space:pre-wrap;"></pre>
+                        </div>
+                        <div id="aiNoCode" class="text-muted small fst-italic d-none">No generated code for this agent type.</div>
+                    </div>
+
+                    @* Recommendations tab *@
+                    <div class="tab-pane fade p-3" id="tab-recs">
+                        <div id="aiRecsContent"></div>
+                        <div id="aiNoRecs" class="text-muted small fst-italic d-none">No recommendations returned.</div>
+                    </div>
+
+                    @* Warnings tab *@
+                    <div class="tab-pane fade p-3" id="tab-warn">
+                        <div id="aiWarningsContent"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        // â”€â”€ Tab persistence via URL hash â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        (function () {
+            const hash = window.location.hash;
+            if (hash) {
+                const btn = document.querySelector(`[data-bs-target="${hash}"]`);
+                if (btn) bootstrap.Tab.getOrCreateInstance(btn).show();
+            }
+            document.querySelectorAll('#mainTabs button').forEach(btn => {
+                btn.addEventListener('shown.bs.tab', e => {
+                    history.replaceState(null, '', e.target.dataset.bsTarget);
+                });
+            });
+        })();
+
+        // â”€â”€ Sync Job ID across all tabs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        document.querySelectorAll('.job-id-input').forEach(src => {
+            src.addEventListener('input', () => {
+                const val = src.value;
+                document.querySelectorAll('.job-id-input').forEach(t => { if (t !== src) t.value = val; });
+                const disp = document.getElementById('sharedJobIdDisplay');
+                if (disp) disp.textContent = val || '-';
+            });
+        });
+
+        // â”€â”€ AI Agent â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        let _lastAiResult = null;
+
+        document.querySelectorAll('.agent-btn').forEach(btn => {
+            btn.addEventListener('click', () => runAgent(btn.dataset.agent, btn));
+        });
+
+        async function runAgent(agentType, srcBtn) {
+            const jobId = document.getElementById('aiAgentJobId').value.trim();
+            if (!jobId) { showAgentError('Please enter a Job ID before running an AI Agent action.'); return; }
+
+            document.querySelectorAll('.agent-btn').forEach(b => b.classList.remove('active-agent'));
+            if (srcBtn) srcBtn.classList.add('active-agent');
+
+            setAgentLoading(true);
+            hideAgentError();
+            document.getElementById('aiAgentResult').classList.add('d-none');
+
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+            const body = new URLSearchParams({ jobId, agentType, __RequestVerificationToken: token });
+
+            try {
+                const resp = await fetch('@Url.Action("RunAgentAction", "Mainframe")', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: body.toString()
+                });
+                const data = await resp.json();
+                if (!data.success) { showAgentError(data.errorMessage || 'AI Agent returned an error.'); return; }
+                _lastAiResult = data.result;
+                renderAgentResult(data.result);
+            } catch (err) {
+                showAgentError('Network error: ' + err.message);
+            } finally {
+                setAgentLoading(false);
+            }
+        }
+
+        function unescapeNewlines(s) {
+            // Guard against literal \n strings that survive JSON transport issues
+            return typeof s === 'string' ? s.replace(/\\n/g, '\n').replace(/\\t/g, '\t') : s;
+        }
+
+        // ── Section metadata: icon + accent colour per ALL-CAPS heading keyword ────
+        function sectionMeta(header) {
+            const h = (header || '').toUpperCase();
+            if (!h) return { icon: 'fa-circle-info', color: '#6c757d' };
+            if (h.match(/PURPOSE|OVERVIEW|PROGRAM/))        return { icon: 'fa-bullseye',              color: '#0d6efd' };
+            if (h.match(/INPUT|OUTPUT|FILE|I\/O|RECORD/))   return { icon: 'fa-arrow-right-arrow-left', color: '#198754' };
+            if (h.match(/TRANSFORM|CONVERSION|PROCESS/))    return { icon: 'fa-gears',                 color: '#fd7e14' };
+            if (h.match(/FIELD|MAPPING|COLUMN|LAYOUT/))     return { icon: 'fa-link',                  color: '#6f42c1' };
+            if (h.match(/VALIDAT/))                          return { icon: 'fa-shield-halved',          color: '#0dcaf0' };
+            if (h.match(/ERROR|EXCEPTION|ABEND|FAULT/))     return { icon: 'fa-triangle-exclamation',  color: '#dc3545' };
+            if (h.match(/BUSINESS|LOGIC|RULE/))             return { icon: 'fa-building',              color: '#6610f2' };
+            if (h.match(/PERFORMANCE|OPTIM/))               return { icon: 'fa-bolt',                  color: '#20c997' };
+            if (h.match(/STRUCT|COPYBOOK/))                 return { icon: 'fa-layer-group',           color: '#0dcaf0' };
+            if (h.match(/VALUE|CODE|LOOKUP|MAP/))           return { icon: 'fa-table',                 color: '#fd7e14' };
+            if (h.match(/DOCUMENT|COMMENT|HEADER/))         return { icon: 'fa-book',                  color: '#6c757d' };
+            if (h.match(/SUMMARY|CONCLUSION/))              return { icon: 'fa-clipboard-check',       color: '#198754' };
+            if (h.match(/JCL|STEP|PROC|DD /))              return { icon: 'fa-server',                color: '#0d6efd' };
+            return { icon: 'fa-circle-info', color: '#6c757d' };
+        }
+
+        // ── Parse structured text into [{header, content}] sections ──────────────
+        function parseSections(text) {
+            if (!text || !text.trim()) return [];
+            // Split on blank lines to get paragraphs
+            const paragraphs = text.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
+            // A section header is ALL-CAPS word(s) ending with colon at the start of a paragraph
+            const headerRe = /^([A-Z][A-Z /\-&]{2,50}):\s*/;
+            const sections = [];
+            for (const para of paragraphs) {
+                const m = headerRe.exec(para);
+                if (m) {
+                    sections.push({ header: m[1].trim(), content: para.slice(m[0].length).trim() });
+                } else if (sections.length > 0) {
+                    // Continuation paragraph — append to last section
+                    sections[sections.length - 1].content += '\n\n' + para;
+                } else {
+                    sections.push({ header: '', content: para });
+                }
+            }
+            return sections;
+        }
+
+        // ── Render plain text as HTML paragraphs (safe) ──────────────────────────
+        function formatParagraphs(text) {
+            if (!text) return '';
+            return text.split(/\n\n+/)
+                .map(p => `<p class="mb-2" style="line-height:1.7;">${escHtml(p.trim()).replace(/\n/g, '<br>')}</p>`)
+                .join('');
+        }
+
+        // ── Build the full Summary tab HTML ──────────────────────────────────────
+        function renderSummaryHtml(text, promptType) {
+            const sections = parseSections(text);
+            if (!sections.length) return `<p class="text-muted fst-italic small">No explanation returned for this agent type.</p>`;
+
+            const noHeaders = sections.every(s => !s.header);
+            let html = '';
+
+            if (noHeaders) {
+                // Unstructured text — render as readable paragraphs in a single card
+                html = `<div class="p-1">${formatParagraphs(sections.map(s => s.content).join('\n\n'))}</div>`;
+            } else {
+                sections.forEach(sec => {
+                    const meta = sectionMeta(sec.header);
+                    if (!sec.header) {
+                        // Preamble before first header
+                        html += `<div class="mb-3 pb-2 text-muted small fst-italic">${formatParagraphs(sec.content)}</div>`;
+                        return;
+                    }
+                    html += `
+                    <div class="mb-3" style="border-left:3px solid ${meta.color};padding-left:14px;">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <i class="fas ${meta.icon} fa-sm" style="color:${meta.color};width:14px;text-align:center;"></i>
+                            <span class="fw-semibold text-uppercase small" style="color:${meta.color};letter-spacing:0.06em;">${escHtml(sec.header)}</span>
+                        </div>
+                        <div>${formatParagraphs(sec.content)}</div>
+                    </div>`;
+                });
+            }
+
+            // Governance notice pinned at the bottom
+            html += `<div class="mt-3 pt-2 border-top">
+                <span class="small text-muted fst-italic">
+                    <i class="fas fa-robot me-1"></i>AI Generated Developer Guidance — Review Required before use in production.
+                </span>
+            </div>`;
+            return html;
+        }
+
+        // ── Main render function ─────────────────────────────────────────────────
+        function renderAgentResult(r) {
+            const confPct   = Math.round((r.confidence || 0) * 100);
+            const confLevel = r.confidenceLevel || '';
+            const confColor = { HIGH: '#198754', MEDIUM: '#fd7e14', LOW: '#dc3545', INSUFFICIENT: '#6c757d' }[confLevel] || '#6c757d';
+            const confBg    = { HIGH: 'bg-success', MEDIUM: 'bg-warning text-dark', LOW: 'bg-danger', INSUFFICIENT: 'bg-secondary' }[confLevel] || 'bg-secondary';
+
+            // Header panel: accent border colour follows confidence level
+            const header = document.getElementById('aiResultHeader');
+            if (header) header.style.borderLeftColor = confColor;
+
+            document.getElementById('aiResultAgentName').innerHTML =
+                `<i class="fas fa-brain me-2" style="color:${confColor};"></i>${escHtml(r.agentName || 'AI Agent')}`;
+            document.getElementById('aiConfidenceBadge').className = `badge rounded-pill ${confBg}`;
+            document.getElementById('aiConfidenceBadge').textContent = `${confLevel} ${confPct}%`;
+            document.getElementById('aiResultJobId').textContent   = r.jobId || '-';
+            document.getElementById('aiResultTime').textContent    = r.responseTimeMs ? r.responseTimeMs.toFixed(0) + ' ms' : '-';
+
+            const tokEl = document.getElementById('aiResultTokens');
+            if (r.tokenUsage && r.tokenUsage.total_tokens > 0) {
+                tokEl.innerHTML = `<i class="fas fa-coins me-1"></i>${r.tokenUsage.total_tokens.toLocaleString()} tokens`;
+                tokEl.classList.remove('d-none');
+            } else { tokEl.textContent = ''; }
+
+            const bar = document.getElementById('aiConfidenceBar');
+            bar.style.width   = confPct + '%';
+            bar.className     = `progress-bar ${confBg.replace('text-dark', '')}`;
+            document.getElementById('aiConfidencePct').textContent  = confPct + '%';
+            document.getElementById('aiConfidencePct').style.color  = confColor;
+
+            // ── Summary tab ──────────────────────────────────────────────────────
+            const explanation = unescapeNewlines(r.businessExplanation) || '';
+            document.getElementById('aiSummaryContent').innerHTML = renderSummaryHtml(explanation, r.promptType);
+
+            // ── Code tab ─────────────────────────────────────────────────────────
+            const codeEl   = document.getElementById('aiCodeContent');
+            const noCodeEl = document.getElementById('aiNoCode');
+            const codeBtnEl = document.getElementById('copyCodeBtn');
+            if (r.generatedCode) {
+                codeEl.textContent = unescapeNewlines(r.generatedCode);
+                codeEl.classList.remove('d-none');
+                noCodeEl.classList.add('d-none');
+                if (codeBtnEl) codeBtnEl.classList.remove('d-none');
+            } else {
+                codeEl.classList.add('d-none');
+                noCodeEl.classList.remove('d-none');
+                if (codeBtnEl) codeBtnEl.classList.add('d-none');
+            }
+
+            // ── Recommendations tab ──────────────────────────────────────────────
+            const recsEl   = document.getElementById('aiRecsContent');
+            const noRecsEl = document.getElementById('aiNoRecs');
+            const recs = r.recommendations || [];
+            document.getElementById('tabRecsBadge').textContent = recs.length;
+            document.getElementById('tabRecsBadge').className   = `badge ms-1 ${recs.length > 0 ? 'bg-primary' : 'bg-secondary'}`;
+            if (recs.length > 0) {
+                noRecsEl.classList.add('d-none');
+                const sevIcon  = { HIGH: 'fa-circle-xmark text-danger', MEDIUM: 'fa-circle-exclamation text-warning', LOW: 'fa-circle-info text-info', INFO: 'fa-circle-info text-secondary' };
+                const sevColor = { HIGH: 'danger', MEDIUM: 'warning', LOW: 'info', INFO: 'secondary' };
+                recsEl.innerHTML = recs.map((rec, idx) => {
+                    const icon = sevIcon[rec.severity] || 'fa-circle-info text-secondary';
+                    const col  = sevColor[rec.severity] || 'secondary';
+                    return `<div class="border rounded p-3 mb-2" style="border-left:3px solid var(--bs-${col}) !important;">
+                        <div class="d-flex align-items-start gap-2">
+                            <i class="fas ${icon} mt-1 flex-shrink-0" style="width:16px;"></i>
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <span class="badge bg-${col} text-${col === 'warning' ? 'dark' : 'white'}" style="font-size:0.7rem;">${escHtml(rec.severity)}</span>
+                                    <span class="text-muted small fw-semibold">${escHtml(rec.category || '')}</span>
+                                    <span class="text-muted small ms-auto">#${idx + 1}</span>
+                                </div>
+                                <div class="mb-1">${escHtml(rec.message || '')}</div>
+                                ${rec.suggestion ? `<div class="small rounded p-2 mt-1" style="background:#f8f9fa;"><i class="fas fa-lightbulb text-warning me-1"></i><em>${escHtml(rec.suggestion)}</em></div>` : ''}
+                                ${rec.codeExample ? `<pre class="mt-2 p-2 rounded mb-0 bg-dark text-light" style="font-size:0.75rem;max-height:200px;overflow-y:auto;white-space:pre-wrap;">${escHtml(rec.codeExample)}</pre>` : ''}
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
+            } else {
+                noRecsEl.classList.remove('d-none');
+                recsEl.innerHTML = '';
+            }
+
+            // ── Warnings tab ─────────────────────────────────────────────────────
+            const warnings = r.warnings || [];
+            const warnBadge = document.getElementById('tabWarnBadge');
+            const nonGovWarnings = warnings.filter(w => !w.startsWith('***'));
+            warnBadge.classList.toggle('d-none', nonGovWarnings.length === 0);
+
+            let warningsHtml = '';
+            // Governance notice: all lines starting with ***
+            const govLines = warnings.filter(w => w.startsWith('***'));
+            if (govLines.length) {
+                warningsHtml += `<div class="d-flex align-items-start gap-3 p-3 rounded mb-3" style="background:#fff8e1;border-left:4px solid #ffc107;">
+                    <i class="fas fa-robot text-warning mt-1 flex-shrink-0 fs-5"></i>
+                    <div>
+                        <div class="fw-semibold mb-1" style="color:#856404;">AI Governance Notice</div>
+                        ${govLines.map(l => `<div class="small" style="color:#856404;font-family:monospace;">${escHtml(l)}</div>`).join('')}
+                    </div>
+                </div>`;
+            }
+            nonGovWarnings.forEach(w => {
+                warningsHtml += `<div class="alert alert-warning py-2 mb-2 small"><i class="fas fa-triangle-exclamation me-2"></i>${escHtml(w)}</div>`;
+            });
+            if (!warningsHtml) warningsHtml = '<p class="text-muted small">No warnings.</p>';
+            document.getElementById('aiWarningsContent').innerHTML = warningsHtml;
+
+            // Show result and scroll
+            document.getElementById('aiAgentResult').classList.remove('d-none');
+            document.getElementById('tab-summary-lnk').click();
+            document.getElementById('aiAgentResult').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function copyCodeContent(btn) {
+            const code = document.getElementById('aiCodeContent')?.textContent || '';
+            navigator.clipboard.writeText(code).then(() => {
+                const orig = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check me-1"></i>Copied!';
+                setTimeout(() => btn.innerHTML = orig, 2000);
+            });
+        }
+
+        function setAgentLoading(on) {
+            document.getElementById('aiAgentSpinner').classList.toggle('d-none', !on);
+            document.querySelectorAll('.agent-btn').forEach(b => b.disabled = on);
+        }
+        function showAgentError(msg) {
+            document.getElementById('aiAgentErrorMsg').textContent = msg;
+            document.getElementById('aiAgentError').classList.remove('d-none');
+        }
+        function hideAgentError() { document.getElementById('aiAgentError').classList.add('d-none'); }
+        function escHtml(str) {
+            return str ? String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : '';
+        }
+        function buildExportText(r) {
+            const lines = [
+                '=====================================', 'MAINFRAME DEVELOPMENT AI AGENT REPORT',
+                '=====================================',
+                'AI Generated Developer Guidance | Review Required', '',
+                'Agent      : ' + (r.agentName || ''), 'Job ID     : ' + (r.jobId || ''),
+                'Confidence : ' + (r.confidenceLevel || '') + ' (' + ((r.confidence||0)*100).toFixed(0) + '%)', '',
+            ];
+            if (r.businessExplanation) lines.push('--- EXPLANATION ---', r.businessExplanation, '');
+            if (r.generatedCode)       lines.push('--- GENERATED CODE ---', r.generatedCode, '');
+            if (r.recommendations?.length) {
+                lines.push('--- RECOMMENDATIONS ---');
+                r.recommendations.forEach((rec, i) => {
+                    lines.push(`[${i+1}] [${rec.severity}] ${rec.category}: ${rec.message}`);
+                    if (rec.suggestion) lines.push('    Suggestion: ' + rec.suggestion);
+                    if (rec.codeExample) lines.push('    Code:\n' + rec.codeExample);
+                });
+            }
+            return lines.join('\n');
+        }
+        function copyAiResult() {
+            if (!_lastAiResult) return;
+            navigator.clipboard.writeText(buildExportText(_lastAiResult)).then(() => {
+                const btn = event.target.closest('button');
+                const orig = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check me-1"></i>Copied!';
+                setTimeout(() => btn.innerHTML = orig, 2000);
+            });
+        }
+        function exportAiResultWord() {
+            if (!_lastAiResult) return;
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([buildExportText(_lastAiResult)], { type: 'application/msword' }));
+            a.download = 'mainframe_ai_' + (_lastAiResult.jobId || 'export') + '.doc';
+            a.click();
+        }
+    </script>
+    <style>
+        .agent-btn.active-agent { box-shadow: 0 0 0 3px rgba(13,110,253,.25); }
+        #mainTabs .nav-link { border-radius: 0; padding: .75rem 1rem; }
+        #mainTabs .nav-link.active { border-bottom-color: #fff; background: #fff; }
+    </style>
+}

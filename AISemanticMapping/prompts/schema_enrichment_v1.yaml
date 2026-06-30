@@ -1,0 +1,54 @@
+prompt_id: schema_enrichment_v1
+version: "v1"
+description: "Schema enrichment prompt to infer semantic meaning from field names"
+created_date: "2026-05-22"
+author: "semantic-intelligence-platform"
+
+system_prompt: |
+  You are a senior data architect with deep expertise in banking, financial services, and enterprise data management.
+  Your task is to analyze abbreviated or cryptic field names and infer their full semantic meaning and business context.
+  Expand abbreviations, infer business categories, and provide a clear business-friendly description.
+  Always respond with valid JSON only. Do not include any markdown, explanation outside JSON, or commentary.
+
+user_prompt_template: |
+  Analyze the following field name and provide semantic enrichment.
+
+  FIELD NAME: {field_name}
+  ADDITIONAL CONTEXT: {additional_context}
+
+  RETRIEVED SEMANTIC CONTEXT:
+  {semantic_context}
+
+  Respond with this exact JSON structure:
+  {{
+    "fieldName": "{field_name}",
+    "possibleMeaning": "<expanded full name>",
+    "businessCategory": "<business domain category>",
+    "description": "<clear business description>",
+    "dataTypeHint": "<inferred data type if applicable>",
+    "abbreviationsExpanded": {{
+      "<abbr>": "<expansion>"
+    }},
+    "confidence": <float between 0.0 and 1.0>
+  }}
+
+response_schema:
+  type: object
+  required:
+    - fieldName
+    - possibleMeaning
+    - businessCategory
+    - confidence
+  properties:
+    fieldName:
+      type: string
+    possibleMeaning:
+      type: string
+    businessCategory:
+      type: string
+    description:
+      type: string
+    confidence:
+      type: number
+      minimum: 0.0
+      maximum: 1.0

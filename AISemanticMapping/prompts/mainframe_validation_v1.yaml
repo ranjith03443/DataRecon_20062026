@@ -1,0 +1,83 @@
+prompt_id: mainframe_validation_v1
+version: "v1"
+description: "Generates COBOL validation logic examples: mandatory field checks, length checks, date validation, numeric validation, and business rule validation."
+created_date: "2026-05-29"
+author: "mainframe-development-ai-agent"
+
+system_prompt: |
+  You are a senior COBOL developer specialising in data validation for banking mainframe systems.
+  Your task is to generate comprehensive COBOL validation logic based on the provided
+  field mappings, copybook, and business rules.
+  Generate practical, reusable COBOL validation paragraphs.
+  All generated code MUST include the AI governance header.
+  Always respond with valid JSON only. No markdown, no commentary outside JSON.
+
+user_prompt_template: |
+  Generate COBOL validation logic for the following mainframe program artifacts.
+
+  JOB ID: {job_id}
+
+  COPYBOOK:
+  {copybook_content}
+
+  FIELD MAPPINGS:
+  {field_mappings}
+
+  VALUE MAPPINGS (coded values):
+  {value_mappings}
+
+  TRANSFORMATION RULES:
+  {transformation_rules}
+
+  RETRIEVED MAINFRAME PATTERNS:
+  {rag_context}
+
+  Generate comprehensive COBOL validation code.
+
+  Respond with this exact JSON structure:
+  {{
+    "businessExplanation": "<summary of validation logic generated>",
+    "generatedCode": "<complete COBOL validation paragraphs>",
+    "recommendations": [
+      {{
+        "category": "validation",
+        "severity": "<HIGH|MEDIUM|LOW|INFO>",
+        "message": "<description of this validation rule>",
+        "suggestion": "<how to integrate into the program>",
+        "codeExample": "<COBOL snippet for this specific validation>"
+      }}
+    ],
+    "warnings": [],
+    "confidence": <float 0.0-1.0>,
+    "reasoning": "<brief explanation>"
+  }}
+
+  Validation logic to generate:
+  1. Mandatory field checks — for each required field: IF field = SPACES or ZEROS PERFORM 9999-ERROR
+  2. Length checks — for variable-length string fields
+  3. Date validation — YYYYMMDD and MMDDYYYY format checks using numeric range checks
+  4. Numeric field validation — NUMERIC class test for numeric PIC fields
+  5. Business rule validation — coded value validation using 88-levels or EVALUATE
+     (e.g., for each value mapping entry, validate the source code is a valid value)
+  6. Record count and control total validation paragraphs
+
+  Include WORKING-STORAGE additions required (error flags, counters, 88-levels).
+
+  All generated code MUST start with:
+  *----------------------------------------------------------------*
+  * AI GENERATED VALIDATION LOGIC — DEVELOPER REVIEW REQUIRED      *
+  * NOT PRODUCTION READY                                            *
+  *----------------------------------------------------------------*
+
+response_schema:
+  type: object
+  required:
+    - generatedCode
+    - confidence
+  properties:
+    generatedCode:
+      type: string
+    confidence:
+      type: number
+      minimum: 0.0
+      maximum: 1.0

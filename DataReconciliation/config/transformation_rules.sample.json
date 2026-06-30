@@ -1,0 +1,25 @@
+{
+  "jobId": "JOB_001",
+  "artifactVersion": "1.0",
+  "rules": [
+    {
+      "sourceField": "ACCOUNT_OPEN_DT",
+      "targetField": "OPEN_DATE",
+      "operation": "DATE_FORMAT",
+      "parameters": {
+        "inputFormat": "YYYY-MM-DD",
+        "outputFormat": "yyyyMMdd"
+      },
+      "confidence": 0.95,
+      "generatedBy": "AI_RULE_INFERENCE"
+    },
+    {
+      "sourceField": "CUSTOMER_NAME",
+      "targetField": "CUSTOMER_NAME",
+      "operation": "UPPERCASE",
+      "parameters": {},
+      "confidence": 0.99,
+      "generatedBy": "RULE_ENGINE"
+    }
+  ]
+}

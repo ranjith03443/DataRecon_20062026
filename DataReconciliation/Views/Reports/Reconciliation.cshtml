@@ -1,0 +1,393 @@
+@model DataReconciliation.Domain.Models.ReconciliationResult
+@{
+    ViewData["Title"] = "Reconciliation Report";
+    var jobId = ViewBag.JobId as string ?? "";
+}
+
+<div class="d-flex align-items-center mb-4 flex-wrap gap-2">
+    <a asp-controller="Workflow" asp-action="Details" asp-route-jobId="@jobId" class="btn btn-outline-secondary me-1">
+        <i class="fas fa-arrow-left"></i>
+    </a>
+    <h2 class="mb-0 me-3"><i class="fas fa-balance-scale me-2 text-info"></i>Reconciliation Report</h2>
+    <code class="text-muted me-auto">@jobId</code>
+    <form asp-action="RunReconciliation" asp-controller="Reports" method="post">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="jobId" value="@jobId" />
+        <button type="submit" class="btn btn-primary btn-sm">
+            <i class="fas fa-redo me-1"></i>Re-run Reconciliation
+        </button>
+    </form>
+    <a asp-controller="Reports" asp-action="Mappings" asp-route-jobId="@jobId" class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-cog me-1"></i>Configure Fields
+    </a>
+</div>
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+        <i class="fas fa-exclamation-circle me-2"></i>@TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@if (Model == null)
+{
+    <div class="alert alert-warning"><i class="fas fa-clock me-2"></i>Reconciliation has not run yet.</div>
+}
+else
+{
+    var matchRate = Model.TotalSourceRecords > 0
+        ? (double)Model.MatchedRecords / Model.TotalSourceRecords * 100
+        : 0;
+    var mismatchIssueCount = Model.Mismatches.Count;
+    var impactedFieldCount = Model.Mismatches
+        .Select(m => m.FieldName)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .Count();
+    var failedRowCount = Model.Mismatches
+        .Select(m => m.RowIndex)
+        .Distinct()
+        .Count();
+    var rowDelta = Math.Abs(Model.TotalSourceRecords - Model.TotalTargetRecords);
+    var firstFailure = Model.Mismatches.FirstOrDefault();
+    var topFailingFields = Model.Mismatches
+        .GroupBy(m => m.FieldName, StringComparer.OrdinalIgnoreCase)
+        .Select(g => new
+        {
+            Field = g.Key,
+            IssueCount = g.Count(),
+            FailedRows = g.Select(x => x.RowIndex).Distinct().Count()
+        })
+        .OrderByDescending(x => x.IssueCount)
+        .ThenBy(x => x.Field)
+        .Take(5)
+        .ToList();
+
+    var excludedTotalTokens = new[] { "ID", "NO", "NUM", "NUMBER", "ACCT", "ACCOUNT", "CIN", "IBAN", "CODE", "KEY", "FLAG", "DATE", "DAY", "MONTH", "YEAR", "STATUS", "TYPE", "RATE", "TENOR", "TERM", "SEQ" };
+    var includedTotalTokens = new[] { "AMOUNT", "AMT", "BAL", "BALANCE", "PREM", "FEE", "INT", "INTEREST", "PRIN", "PRINCIPAL", "TOTAL", "VALUE", "CHARGE", "PAYMENT" };
+    var displayTotals = Model.FieldTotals
+        .Where(ft =>
+            !excludedTotalTokens.Any(t => ft.Key.Contains(t, StringComparison.OrdinalIgnoreCase))
+            && includedTotalTokens.Any(t => ft.Key.Contains(t, StringComparison.OrdinalIgnoreCase)))
+        .ToList();
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-2">
+            <div class="card text-center">
+                <div class="card-body">
+                    <div class="fs-3 fw-bold text-primary">@Model.TotalSourceRecords</div>
+                    <div class="small text-muted">Source Records</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center">
+                <div class="card-body">
+                    <div class="fs-3 fw-bold text-info">@Model.TotalTargetRecords</div>
+                    <div class="small text-muted">Target Records</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center">
+                <div class="card-body">
+                    <div class="fs-3 fw-bold text-success">@Model.MatchedRecords</div>
+                    <div class="small text-muted">Matched</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center">
+                <div class="card-body">
+                    <div class="fs-3 fw-bold text-warning">@Model.MismatchedRecords</div>
+                    <div class="small text-muted">Mismatched</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center">
+                <div class="card-body">
+                    <div class="fs-3 fw-bold text-danger">@Model.ErrorRecords</div>
+                    <div class="small text-muted">Errors</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center">
+                <div class="card-body">
+                    @{
+                        var statusBadge = Model.OverallStatus.ToString() switch
+                        {
+                            "SUCCESS" => "success",
+                            "PARTIAL_SUCCESS" => "warning",
+                            "FAILED" => "danger",
+                            _ => "secondary"
+                        };
+                    }
+                    <span class="badge bg-@statusBadge fs-6">@Model.OverallStatus</span>
+                    <div class="small text-muted mt-1">Overall Status</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Match Rate Progress -->
+    @if (Model.TotalSourceRecords > 0)
+    {
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-1">
+                    <span class="small fw-semibold">Match Rate</span>
+                    <span class="small">@matchRate.ToString("F1")%</span>
+                </div>
+                <div class="progress" style="height: 20px;">
+                    <div class="progress-bar bg-success" style="width: @matchRate%">@matchRate.ToString("F1")%</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card h-100 border-0 bg-light">
+                    <div class="card-body py-3">
+                        <div class="small text-muted">Row Delta</div>
+                        <div class="fw-bold fs-5">@rowDelta</div>
+                        <div class="small text-muted">| source - target |</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card h-100 border-0 bg-light">
+                    <div class="card-body py-3">
+                        <div class="small text-muted">Failed Rows</div>
+                        <div class="fw-bold fs-5">@failedRowCount</div>
+                        <div class="small text-muted">rows with at least 1 issue</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card h-100 border-0 bg-light">
+                    <div class="card-body py-3">
+                        <div class="small text-muted">Mismatch Entries</div>
+                        <div class="fw-bold fs-5">@mismatchIssueCount</div>
+                        <div class="small text-muted">field-level mismatch entries</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card h-100 border-0 bg-light">
+                    <div class="card-body py-3">
+                        <div class="small text-muted">Impacted Fields</div>
+                        <div class="fw-bold fs-5">@impactedFieldCount</div>
+                        <div class="small text-muted">distinct target fields</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card h-100 border-0 bg-light">
+                    <div class="card-body py-3">
+                        <div class="small text-muted">Report Generated</div>
+                        <div class="fw-bold small">@Model.GeneratedAt.ToString("yyyy-MM-dd")</div>
+                        <div class="small text-muted">@Model.GeneratedAt.ToString("HH:mm:ss") UTC</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="card h-100 border-0 bg-light">
+                    <div class="card-body py-3">
+                        <div class="small text-muted mb-2">First Failure Example</div>
+                        @if (firstFailure != null)
+                        {
+                            <div class="small">
+                                Row <span class="fw-semibold">@firstFailure.RowIndex</span>
+                                · Field <code>@firstFailure.FieldName</code>
+                                · Value <span class="text-danger">@(firstFailure.TransformedValue ?? "(empty)")</span>
+                            </div>
+                            <div class="small text-muted mt-1">@firstFailure.MismatchReason</div>
+                        }
+                        else
+                        {
+                            <div class="small text-muted">No failures found.</div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (topFailingFields.Any())
+    {
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-chart-column me-2 text-danger"></i>Top 5 Failing Target Fields</h5>
+            </div>
+            <div class="card-body py-2">
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Field</th>
+                                <th class="text-end">Issue Count</th>
+                                <th class="text-end">Failed Rows</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in topFailingFields)
+                            {
+                                <tr>
+                                    <td><code>@item.Field</code></td>
+                                    <td class="text-end fw-semibold">@item.IssueCount</td>
+                                    <td class="text-end">@item.FailedRows</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Mismatches Table -->
+    @if (Model.Mismatches.Any())
+    {
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2 text-warning"></i>Mismatches (@Model.Mismatches.Count)</h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Row</th>
+                            <th>Field</th>
+                            <th>Transformed Value</th>
+                            <th>Expected Format</th>
+                            <th>Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var mismatch in Model.Mismatches.Take(100))
+                        {
+                            <tr>
+                                <td>@mismatch.RowIndex</td>
+                                <td><code>@mismatch.FieldName</code></td>
+                                <td class="text-danger">@(mismatch.TransformedValue ?? "(empty)")</td>
+                                <td class="text-muted small">@mismatch.ExpectedFormat</td>
+                                <td class="small">@mismatch.MismatchReason</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    <!-- Financial Control Totals -->
+    @if (displayTotals.Any() || Model.SourceFieldTotals.Any() || Model.SourceFieldCounts.Any())
+    {
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-calculator me-2"></i>Reconciliation Verification</h5>
+                <div class="small text-muted mt-1">Source vs Target comparison based on configured reconciliation fields.</div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="text-center" style="width:25%">Field</th>
+                                <th class="text-center" style="width:15%">Validation Type</th>
+                                <th class="text-center bg-primary bg-opacity-10" style="width:22%"><i class="fas fa-database me-1"></i>Source</th>
+                                <th class="text-center bg-success bg-opacity-10" style="width:22%"><i class="fas fa-bullseye me-1"></i>Target</th>
+                                <th class="text-center" style="width:16%">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @* SUM fields *@
+                            @foreach (var field in Model.SourceFieldTotals)
+                            {
+                                var targetVal = Model.FieldTotals.ContainsKey(field.Key) ? Model.FieldTotals[field.Key] : 0m;
+                                var sourceVal = field.Value;
+                                var isMatch = sourceVal == targetVal;
+                                var diff = targetVal - sourceVal;
+                                <tr>
+                                    <td class="fw-semibold"><code>@field.Key</code></td>
+                                    <td class="text-center"><span class="badge bg-info">SUM</span></td>
+                                    <td class="text-center bg-primary bg-opacity-10">
+                                        <span class="fw-bold">@sourceVal.ToString("N2")</span>
+                                    </td>
+                                    <td class="text-center bg-success bg-opacity-10">
+                                        <span class="fw-bold">@targetVal.ToString("N2")</span>
+                                    </td>
+                                    <td class="text-center">
+                                        @if (isMatch)
+                                        {
+                                            <span class="badge bg-success"><i class="fas fa-check me-1"></i>Match</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-danger"><i class="fas fa-times me-1"></i>Diff: @diff.ToString("N2")</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                            @* COUNT fields *@
+                            @foreach (var field in Model.SourceFieldCounts)
+                            {
+                                var targetCount = Model.TargetFieldCounts.ContainsKey(field.Key) ? Model.TargetFieldCounts[field.Key] : 0;
+                                var sourceCount = field.Value;
+                                var isMatch = sourceCount == targetCount;
+                                <tr>
+                                    <td class="fw-semibold"><code>@field.Key</code></td>
+                                    <td class="text-center"><span class="badge bg-warning text-dark">COUNT</span></td>
+                                    <td class="text-center bg-primary bg-opacity-10">
+                                        <span class="fw-bold">@sourceCount.ToString("N0")</span>
+                                    </td>
+                                    <td class="text-center bg-success bg-opacity-10">
+                                        <span class="fw-bold">@targetCount.ToString("N0")</span>
+                                    </td>
+                                    <td class="text-center">
+                                        @if (isMatch)
+                                        {
+                                            <span class="badge bg-success"><i class="fas fa-check me-1"></i>Match</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-danger"><i class="fas fa-times me-1"></i>Diff: @((targetCount - sourceCount).ToString("+0;-0;0"))</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                            @* Legacy: FieldTotals without SourceFieldTotals (old runs before config was saved) *@
+                            @if (!Model.SourceFieldTotals.Any() && !Model.SourceFieldCounts.Any() && displayTotals.Any())
+                            {
+                                foreach (var total in displayTotals)
+                                {
+                                    <tr>
+                                        <td class="fw-semibold"><code>@total.Key</code></td>
+                                        <td class="text-center"><span class="badge bg-info">SUM</span></td>
+                                        <td class="text-center bg-primary bg-opacity-10 text-muted small">N/A (re-run recon)</td>
+                                        <td class="text-center bg-success bg-opacity-10">
+                                            <span class="fw-bold">@total.Value.ToString("N2")</span>
+                                        </td>
+                                        <td class="text-center"><span class="badge bg-secondary">Target Only</span></td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-light border mb-0">
+            <i class="fas fa-info-circle me-2 text-muted"></i>
+            No reconciliation verification data available. Configure reconciliation fields in the Mapping Workbench and re-run output generation.
+        </div>
+    }
+}

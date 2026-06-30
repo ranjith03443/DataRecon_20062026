@@ -1,0 +1,26 @@
+ACT_ID,KUNDEN_STREET,KUNDEN_HOUSE_NUMBER,KUNDEN_COUNTRY
+ACT001,Kurfürstendamm,42,Germany
+ACT002,Hauptstraße,17,Germany
+ACT003,Rue de Rivoli,8B,France
+ACT004,Via Roma,101,Italy
+ACT005,Via Veneto,5,Italy
+ACT006,Calle de Alcalá,223,Spain
+ACT007,Herengracht,7,Netherlands
+ACT008,Nowy Świat,19,Poland
+ACT009,Drottninggatan,33,Sweden
+ACT010,Rue Neuve,88,Belgium
+ACT011,Mariahilfer Straße,456,Austria
+ACT012,Avenida da Liberdade,12,Portugal
+ACT013,Storgatan,3,Sweden
+ACT014,Graben,221B,Austria
+ACT015,Strada Unirii,14C,Romania
+ACT016,Wenceslas Square,99,Czech Republic
+ACT017,Ermou Street,1000,Greece
+ACT018,Corso Vittorio,27,Italy
+ACT019,Marszałkowska,55,Poland
+ACT020,Váci Street,78,Hungary
+ACT021,Ludwigstraße,200,Germany
+ACT022,O'Connell Street,6,Ireland
+ACT023,Champs-Élysées,45,France
+ACT024,Avenue Louise,30,Belgium
+ACT025,Váci Street,11,Hungary

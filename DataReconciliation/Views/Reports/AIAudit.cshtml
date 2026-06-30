@@ -1,0 +1,99 @@
+@model List<DataReconciliation.Domain.Entities.AIInferenceAudit>
+@{
+    ViewData["Title"] = "AI Audit Log";
+    var jobId = ViewBag.JobId as string ?? "";
+}
+
+<div class="d-flex align-items-center mb-4">
+    <a asp-controller="Workflow" asp-action="Details" asp-route-jobId="@jobId" class="btn btn-outline-secondary me-3">
+        <i class="fas fa-arrow-left"></i>
+    </a>
+    <h2 class="mb-0"><i class="fas fa-robot me-2 text-warning"></i>AI Audit Log</h2>
+    <code class="ms-3 text-muted">@jobId</code>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">No AI inference calls recorded for this job.</div>
+}
+else
+{
+    <!-- Summary -->
+    <div class="row mb-4">
+        <div class="col-md-2">
+            <div class="card text-center"><div class="card-body">
+                <div class="fs-4 fw-bold">@Model.Count</div><div class="small text-muted">Total AI Calls</div>
+            </div></div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center"><div class="card-body">
+                <div class="fs-4 fw-bold text-success">@Model.Count(a => a.WasCached)</div><div class="small text-muted">Cache Hits</div>
+            </div></div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center"><div class="card-body">
+                <div class="fs-4 fw-bold text-primary">@Model.Count(a => a.WasAccepted)</div><div class="small text-muted">Accepted</div>
+            </div></div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center"><div class="card-body">
+                <div class="fs-4 fw-bold">@(Model.Any() ? Model.Average(a => a.ConfidenceScore ?? 0).ToString("F2") : "N/A")</div><div class="small text-muted">Avg Confidence</div>
+            </div></div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center"><div class="card-body">
+                <div class="fs-4 fw-bold text-info">@(Model.Sum(a => a.TotalTokens ?? 0).ToString("N0"))</div><div class="small text-muted">Total Tokens</div>
+            </div></div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center"><div class="card-body">
+                <div class="fs-4 fw-bold text-warning">$@(Model.Sum(a => a.EstimatedCostUsd ?? 0).ToString("F4"))</div><div class="small text-muted">Est. Cost (USD)</div>
+            </div></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Step</th>
+                        <th>Cache Key</th>
+                        <th>Confidence</th>
+                        <th>Cached?</th>
+                        <th>Accepted?</th>
+                        <th>Retries</th>
+                        <th>Prompt Tokens</th>
+                        <th>Completion Tokens</th>
+                        <th>Total Tokens</th>
+                        <th>Est. Cost (USD)</th>
+                        <th>Duration</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var audit in Model)
+                    {
+                        var confClass = audit.ConfidenceScore >= 0.90 ? "confidence-high"
+                            : audit.ConfidenceScore >= 0.70 ? "confidence-medium"
+                            : "confidence-low";
+                        <tr>
+                            <td><span class="badge bg-secondary small">@audit.Step</span></td>
+                            <td><code class="small">@(audit.CacheKey?.Length > 20 ? audit.CacheKey[..20] + "…" : audit.CacheKey)</code></td>
+                            <td class="@confClass">@(audit.ConfidenceScore?.ToString("F2") ?? "-")</td>
+                            <td>@(audit.WasCached ? "✅" : "❌")</td>
+                            <td>@(audit.WasAccepted ? "✅" : "❌")</td>
+                            <td>@audit.RetryCount</td>
+                            <td class="small text-muted">@(audit.PromptTokens?.ToString("N0") ?? "-")</td>
+                            <td class="small text-muted">@(audit.CompletionTokens?.ToString("N0") ?? "-")</td>
+                            <td class="small @(audit.TotalTokens.HasValue ? "text-info fw-semibold" : "text-muted")">@(audit.TotalTokens?.ToString("N0") ?? "-")</td>
+                            <td class="small @(audit.EstimatedCostUsd.HasValue ? "text-warning" : "text-muted")">@(audit.EstimatedCostUsd.HasValue ? "$" + audit.EstimatedCostUsd.Value.ToString("F4") : "-")</td>
+                            <td class="small">@(audit.DurationMs?.ToString("F0") ?? "-")ms</td>
+                            <td class="small">@audit.RequestedAt.ToString("HH:mm:ss")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}

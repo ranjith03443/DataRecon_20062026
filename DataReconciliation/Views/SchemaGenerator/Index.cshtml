@@ -1,0 +1,449 @@
+@model DataReconciliation.Application.DTOs.TargetSchemaGeneratorPageDto
+
+@{
+    ViewData["Title"] = "Target Schema Generator";
+    var result = Model.Result;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1"><i class="fas fa-table-columns me-2 text-primary"></i>Target Schema Generator</h2>
+        <p class="text-muted mb-0">Upload a source CSV or Excel file, infer a governed draft target schema, and download the generated workbook.</p>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+        <i class="fas fa-circle-check me-2"></i>@TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<ul class="nav nav-tabs mb-4" id="schemaGenTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="tab-generate-btn" data-bs-toggle="tab"
+                data-bs-target="#tab-generate" type="button" role="tab">
+            <i class="fas fa-wand-magic-sparkles me-1"></i>Generate Schema
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-multi-btn" data-bs-toggle="tab"
+                data-bs-target="#tab-multi" type="button" role="tab">
+            <i class="fas fa-layer-group me-1"></i>Multi-Source
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-workflow-btn" data-bs-toggle="tab"
+                data-bs-target="#tab-workflow" type="button" role="tab">
+            <i class="fas fa-list-check me-1"></i>How It Works
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="schemaGenTabContent">
+
+    @* ── Generate tab ──────────────────────────────────────────────────────────── *@
+    <div class="tab-pane fade show active" id="tab-generate" role="tabpanel">
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Create draft schema</h5>
+
+                <form asp-action="Generate" method="post" enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
+
+                    <div class="mb-3">
+                        <label asp-for="Request.SchemaName" class="form-label">Schema name</label>
+                        <input asp-for="Request.SchemaName" class="form-control" placeholder="Customer Remediation Target Schema" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Request.SourceFile" class="form-label">Source file</label>
+                        <input asp-for="Request.SourceFile" type="file" class="form-control" accept=".csv,.txt,.xls,.xlsx" />
+                        <span asp-validation-for="Request.SourceFile" class="text-danger small"></span>
+                    </div>
+
+                    <div class="form-check form-switch mb-3">
+                        <input asp-for="Request.UseAiEnrichment" class="form-check-input" />
+                        <label asp-for="Request.UseAiEnrichment" class="form-check-label">Use AI semantic enrichment for richer descriptions</label>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-wand-magic-sparkles me-2"></i>Generate Target Schema
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        @if (result != null)
+        {
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+                        <div>
+                            <h5 class="card-title mb-1">Generated schema preview</h5>
+                            <p class="text-muted mb-0 small">
+                                Job ID: @result.JobId &middot;
+                                @if (result.IsMultiSource && result.SourceFileNames.Count > 0)
+                                {
+                                    <span>Sources: @string.Join(", ", result.SourceFileNames)</span>
+                                }
+                                else
+                                {
+                                    <span>Source: @result.SourceFileName</span>
+                                }
+                                &middot; Generated: @result.GeneratedAt.ToString("yyyy-MM-dd HH:mm:ss") UTC
+                            </p>
+                            @if (result.IsMultiSource)
+                            {
+                                @foreach (var (fn, fi) in result.SourceFileNames.Select((f, i) => (f, i)))
+                                {
+                                    var badgeColors = new[] { "bg-primary", "bg-warning", "bg-info", "bg-success", "bg-danger" };
+                                    <span class="badge @badgeColors[fi % badgeColors.Length] me-1">File @(fi+1): @fn</span>
+                                }
+                            }
+                        </div>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <a class="btn btn-success btn-sm"
+                               asp-action="Download"
+                               asp-route-jobId="@result.JobId"
+                               asp-route-fileName="@result.WorkbookFileName">
+                                <i class="fas fa-file-excel me-1"></i>Download Workbook
+                            </a>
+                            <a class="btn btn-outline-secondary btn-sm"
+                               asp-action="DownloadMapping"
+                               asp-route-jobId="@result.JobId">
+                                <i class="fas fa-file-arrow-down me-1"></i>Download Mapping
+                            </a>
+                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                    data-bs-toggle="collapse" data-bs-target="#uploadMappingPanel">
+                                <i class="fas fa-file-arrow-up me-1"></i>Upload Edited Mapping
+                            </button>
+                            <button type="button" id="btnEditSchema" class="btn btn-outline-primary btn-sm" onclick="startEdit()">
+                                <i class="fas fa-pen me-1"></i>Edit Schema
+                            </button>
+                        </div>
+                    </div>
+
+                    @* ── Upload Mapping panel ─────────────────────────────────────────── *@
+                    <div class="collapse mb-3" id="uploadMappingPanel">
+                        <div class="card card-body bg-light border">
+                            <p class="small mb-2 text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Download the mapping Excel, edit it (add/change source fields, merge rules, datatypes, etc.),
+                                then upload it here to regenerate the workbook.
+                            </p>
+                            <form asp-action="ImportMapping" method="post" enctype="multipart/form-data" class="row g-2 align-items-end">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="JobId"      value="@result.JobId" />
+                                <input type="hidden" name="SchemaName" value="@result.SchemaName" />
+                                <div class="col-auto flex-grow-1">
+                                    <input type="file" name="MappingFile" class="form-control form-control-sm"
+                                           accept=".xlsx,.xls" required />
+                                </div>
+                                <div class="col-auto">
+                                    <button type="submit" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-upload me-1"></i>Import &amp; Regenerate
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <div class="border rounded p-3 bg-light">
+                                <div class="text-muted small">Schema name</div>
+                                <div class="fw-semibold">@result.SchemaName</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-3 bg-light">
+                                <div class="text-muted small">Field count</div>
+                                <div class="fw-semibold">@result.Fields.Count</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-3 bg-light">
+                                <div class="text-muted small">AI enrichment</div>
+                                <div class="fw-semibold">@(result.UsedAiEnrichment ? "Enabled" : "Disabled")</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    @* Save-edits form wraps the table *@
+                    <form id="saveEditsForm" asp-action="SaveEdits" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="JobId" value="@result.JobId" />
+                        <input type="hidden" name="SchemaName" value="@result.SchemaName" />
+                        <input type="hidden" name="SourceFileName" value="@result.SourceFileName" />
+                        <input type="hidden" name="IsMultiSource" value="@result.IsMultiSource.ToString().ToLower()" />
+                        <input type="hidden" name="UsedAiEnrichment" value="@result.UsedAiEnrichment.ToString().ToLower()" />
+                        @for (int sfi = 0; sfi < result.SourceFileNames.Count; sfi++)
+                        {
+                            <input type="hidden" name="SourceFileNames[@sfi]" value="@result.SourceFileNames[sfi]" />
+                        }
+
+                        @* Edit-mode toolbar *@
+                        <div id="editToolbar" class="d-none alert alert-info py-2 px-3 mb-3 d-flex align-items-center gap-3">
+                            <i class="fas fa-pen-to-square"></i>
+                            <span class="small fw-semibold">Edit mode — modify Target Field, Type, Length, Format, Description and Allowed Values, then save.</span>
+                            <div class="ms-auto d-flex gap-2">
+                                <button type="submit" class="btn btn-success btn-sm">
+                                    <i class="fas fa-floppy-disk me-1"></i>Save Changes
+                                </button>
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="cancelEdit()">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover align-middle" id="schemaTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Source Field(s)</th>
+                                        <th>Target Field</th>
+                                        <th>Type</th>
+                                        <th>Length</th>
+                                        <th>Nullable</th>
+                                        <th>Sample</th>
+                                        <th>Format</th>
+                                        <th>Allowed Values</th>
+                                        <th>Description</th>
+                                        <th>Confidence</th>
+                                        <th>Method</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @{
+                                        var idx = 0;
+                                        foreach (var field in result.Fields.OrderBy(f => f.ColumnOrder))
+                                        {
+                                            var confidenceClass = field.Confidence >= 0.85 ? "confidence-high"
+                                                : field.Confidence >= 0.7 ? "confidence-medium" : "confidence-low";
+
+                                            <tr>
+                                                @* Source Field(s) — read-only; hidden inputs for preserved fields live here *@
+                                                <td class="fw-semibold">
+                                                    @if (field.SourceMappings.Count > 0)
+                                                    {
+                                                        var ruleColors = new Dictionary<string,string> { ["PRIMARY"]="bg-primary", ["FALLBACK"]="bg-secondary", ["CONCAT"]="bg-info" };
+                                                        @foreach (var sm in field.SourceMappings)
+                                                        {
+                                                            var rc = ruleColors.GetValueOrDefault(sm.MergeRule, "bg-secondary");
+                                                            <div class="small">
+                                                                <span class="badge @rc me-1" title="@sm.SourceFileName">F@(sm.SourceFileIndex+1)</span>
+                                                                @sm.SourceField
+                                                                <span class="text-muted">(@sm.MergeRule)</span>
+                                                            </div>
+                                                            <input type="hidden" name="Fields[@idx].SourceMappings[@field.SourceMappings.IndexOf(sm)].SourceFileName"  value="@sm.SourceFileName" />
+                                                            <input type="hidden" name="Fields[@idx].SourceMappings[@field.SourceMappings.IndexOf(sm)].SourceFileIndex" value="@sm.SourceFileIndex" />
+                                                            <input type="hidden" name="Fields[@idx].SourceMappings[@field.SourceMappings.IndexOf(sm)].SourceField"     value="@sm.SourceField" />
+                                                            <input type="hidden" name="Fields[@idx].SourceMappings[@field.SourceMappings.IndexOf(sm)].MergeRule"       value="@sm.MergeRule" />
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        @field.SourceField
+                                                    }
+                                                    <input type="hidden" name="Fields[@idx].ColumnOrder" value="@field.ColumnOrder" />
+                                                    <input type="hidden" name="Fields[@idx].SourceField" value="@field.SourceField" />
+                                                    <input type="hidden" name="Fields[@idx].SampleValue" value="@field.SampleValue" />
+                                                    <input type="hidden" name="Fields[@idx].Confidence" value="@field.Confidence.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" />
+                                                    <input type="hidden" name="Fields[@idx].GenerationMethod" value="@field.GenerationMethod" />
+                                                </td>
+
+                                                @* Target Field — editable *@
+                                                <td>
+                                                    <span class="cell-view">@field.TargetField</span>
+                                                    <input class="cell-edit form-control form-control-sm d-none"
+                                                           name="Fields[@idx].TargetField" value="@field.TargetField" />
+                                                </td>
+
+                                                @* Type — editable *@
+                                                <td>
+                                                    <span class="cell-view">@field.Datatype</span>
+                                                    <select class="cell-edit form-select form-select-sm d-none"
+                                                            name="Fields[@idx].Datatype">
+                                                        @foreach (var dt in new[] { "STRING", "INTEGER", "DECIMAL", "DATETIME", "BOOLEAN" })
+                                                        {
+                                                            if (field.Datatype == dt)
+                                                            {
+                                                                <option value="@dt" selected="selected">@dt</option>
+                                                            }
+                                                            else
+                                                            {
+                                                                <option value="@dt">@dt</option>
+                                                            }
+                                                        }
+                                                    </select>
+                                                </td>
+
+                                                @* Length — editable *@
+                                                <td>
+                                                    <span class="cell-view">@(field.FieldLength?.ToString() ?? "-")</span>
+                                                    <input class="cell-edit form-control form-control-sm d-none"
+                                                           name="Fields[@idx].FieldLength" type="number" min="1"
+                                                           value="@field.FieldLength" />
+                                                </td>
+
+                                                @* Nullable — editable *@
+                                                <td>
+                                                    <span class="cell-view">@(field.Nullable ? "Y" : "N")</span>
+                                                    <select class="cell-edit form-select form-select-sm d-none"
+                                                            name="Fields[@idx].Nullable">
+                                                        @if (field.Nullable)
+                                                        {
+                                                            <option value="true" selected="selected">Y</option>
+                                                            <option value="false">N</option>
+                                                        }
+                                                        else
+                                                        {
+                                                            <option value="true">Y</option>
+                                                            <option value="false" selected="selected">N</option>
+                                                        }
+                                                    </select>
+                                                </td>
+
+                                                @* Sample — read-only display *@
+                                                <td>@(field.SampleValue ?? "-")</td>
+
+                                                @* Format — editable *@
+                                                <td>
+                                                    <span class="cell-view">@(field.Format ?? "-")</span>
+                                                    <input class="cell-edit form-control form-control-sm d-none"
+                                                           name="Fields[@idx].Format" value="@field.Format" />
+                                                </td>
+
+                                                @* Allowed Values — editable *@
+                                                <td>
+                                                    <span class="cell-view">@(field.AllowedValues ?? "-")</span>
+                                                    <input class="cell-edit form-control form-control-sm d-none"
+                                                           name="Fields[@idx].AllowedValues" value="@field.AllowedValues" />
+                                                </td>
+
+                                                @* Description — editable *@
+                                                <td>
+                                                    <span class="cell-view">@field.Description</span>
+                                                    <input class="cell-edit form-control form-control-sm d-none"
+                                                           name="Fields[@idx].Description" value="@field.Description" />
+                                                </td>
+
+                                                @* Confidence & Method — read-only display *@
+                                                <td><span class="@confidenceClass">@field.Confidence.ToString("0.00")</span></td>
+                                                <td>@field.GenerationMethod</td>
+                                            </tr>
+                                            idx++;
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        }
+    </div>
+
+    @* ── Multi-Source tab ─────────────────────────────────────────────────────── *@
+    <div class="tab-pane fade" id="tab-multi" role="tabpanel">
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="card-title mb-1">Generate schema from multiple source files</h5>
+                <p class="text-muted small mb-3">
+                    Upload two or more source files at once. The AI will analyse all of them together and produce
+                    a single unified target schema, resolving duplicate fields and assigning merge rules
+                    (PRIMARY / FALLBACK / CONCAT) automatically.
+                </p>
+
+                <form asp-action="GenerateMultiSource" method="post" enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
+
+                    <div class="mb-3">
+                        <label class="form-label">Schema name</label>
+                        <input type="text" name="SchemaName" class="form-control"
+                               value="Generated Target Schema" placeholder="Unified Customer Schema" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Source files <span class="text-muted fw-normal">(select 2 or more)</span></label>
+                        <input type="file" name="SourceFiles" class="form-control" multiple
+                               accept=".csv,.txt,.xls,.xlsx" required />
+                        <div class="form-text">Hold Ctrl / Cmd to select multiple files. Accepts CSV, TXT, XLS, XLSX.</div>
+                    </div>
+
+                    <div class="form-check form-switch mb-3">
+                        <input type="checkbox" name="UseAiEnrichment" class="form-check-input" checked value="true" />
+                        <label class="form-check-label">Use AI to merge schemas and assign merge rules</label>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-layer-group me-2"></i>Generate Unified Target Schema
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="alert alert-info small mb-0">
+            <strong>Merge rules explained:</strong>
+            <span class="badge bg-primary ms-1">PRIMARY</span> – canonical source value is used. &nbsp;
+            <span class="badge bg-secondary">FALLBACK</span> – used only when the PRIMARY value is null/blank. &nbsp;
+            <span class="badge bg-info">CONCAT</span> – values are concatenated with a space (e.g. first + last name).
+        </div>
+
+    </div>
+
+    @* ── How It Works tab ─────────────────────────────────────────────────────── *@
+    <div class="tab-pane fade" id="tab-workflow" role="tabpanel">
+        <div class="card" style="max-width: 560px;">
+            <div class="card-body">
+                <h5 class="card-title mb-3"><i class="fas fa-diagram-project me-2 text-primary"></i>Generator Workflow</h5>
+                <div class="step-timeline">
+                    <div class="step-item completed">
+                        <h6 class="mb-1">1. Upload source file</h6>
+                        <p class="text-muted mb-0 small">Accepts CSV, TXT, XLS, and XLSX source layouts.</p>
+                    </div>
+                    <div class="step-item running">
+                        <h6 class="mb-1">2. Profile columns</h6>
+                        <p class="text-muted mb-0 small">Infers datatype, nullability, length, patterns, and sample values.</p>
+                    </div>
+                    <div class="step-item">
+                        <h6 class="mb-1">3. Enrich semantics</h6>
+                        <p class="text-muted mb-0 small">Optionally uses existing AI enrichment for descriptions and business meaning.</p>
+                    </div>
+                    <div class="step-item">
+                        <h6 class="mb-1">4. Generate workbook</h6>
+                        <p class="text-muted mb-0 small">Produces a downloadable .xlsx target schema draft for review.</p>
+                    </div>
+                    <div class="step-item">
+                        <h6 class="mb-1">5. Review &amp; edit</h6>
+                        <p class="text-muted mb-0 small">Use the Edit Schema button to correct field names, types and descriptions directly in the browser, then save to regenerate the workbook.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        function startEdit() {
+            document.querySelectorAll('.cell-view').forEach(el => el.classList.add('d-none'));
+            document.querySelectorAll('.cell-edit').forEach(el => el.classList.remove('d-none'));
+            document.getElementById('editToolbar').classList.remove('d-none');
+            document.getElementById('btnEditSchema').classList.add('d-none');
+        }
+
+        function cancelEdit() {
+            document.querySelectorAll('.cell-view').forEach(el => el.classList.remove('d-none'));
+            document.querySelectorAll('.cell-edit').forEach(el => el.classList.add('d-none'));
+            document.getElementById('editToolbar').classList.add('d-none');
+            document.getElementById('btnEditSchema').classList.remove('d-none');
+        }
+    </script>
+}

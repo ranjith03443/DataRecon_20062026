@@ -1,0 +1,691 @@
+@model DataReconciliation.Application.DTOs.CreateWorkflowRequest
+@{
+    ViewData["Title"] = "Create New Workflow";
+}
+
+<div class="d-flex align-items-center mb-4">
+    <a asp-action="Index" class="btn btn-outline-secondary me-3">
+        <i class="fas fa-arrow-left"></i>
+    </a>
+    <h2 class="mb-0"><i class="fas fa-plus-circle me-2 text-primary"></i>Create New Workflow</h2>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+
+        <!-- Input Mode Tabs -->
+        <ul class="nav nav-tabs" id="inputModeTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="upload-tab" data-bs-toggle="tab" data-bs-target="#uploadTab" type="button" role="tab">
+                    <i class="fas fa-upload me-1"></i>Upload Individual Files
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="folder-tab" data-bs-toggle="tab" data-bs-target="#folderTab" type="button" role="tab">
+                    <i class="fas fa-folder-open me-1"></i>Scan Folder
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content">
+
+            <!-- ── Tab 1 : Upload Individual Files ─────────────────────────── -->
+            <div class="tab-pane fade show active" id="uploadTab" role="tabpanel">
+                <div class="card" style="border-top-left-radius:0;border-top-right-radius:0;border-top:0">
+                    <div class="card-body">
+                        <form asp-action="Create" method="post" enctype="multipart/form-data" id="workflowForm">
+                            @Html.AntiForgeryToken()
+
+                            <div asp-validation-summary="All" class="alert alert-danger" style="display:none"></div>
+
+                            <!-- Auto-generated Job ID notice -->
+                            <div class="alert alert-info d-flex align-items-center py-2 mb-3">
+                                <i class="fas fa-tag me-2"></i>
+                                <span class="small">Job ID is <strong>auto-generated</strong> as <code>JOB_YYYYMMDDHHMMSS_XXXXXX</code> — no input needed.</span>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Job Name <span class="text-danger">*</span></label>
+                                <input asp-for="JobName" class="form-control" placeholder="e.g. Loan Onboarding - Batch 001" required />
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold">Description</label>
+                                <textarea asp-for="Description" class="form-control" rows="2" placeholder="Optional description"></textarea>
+                            </div>
+
+                            <h5 class="mb-3 border-bottom pb-2">
+                                <i class="fas fa-database me-2"></i>Datasets
+                            </h5>
+
+                            <div id="datasetsContainer">
+                                <!-- Dataset entries will be added here -->
+                            </div>
+
+                            <button type="button" class="btn btn-outline-secondary mb-3" onclick="addDataset()">
+                                <i class="fas fa-plus me-1"></i>Add Dataset
+                            </button>
+
+                            <div class="d-grid mt-3">
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-play me-2"></i>Start Workflow
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Tab 2 : Scan Folder ─────────────────────────────────────── -->
+            <div class="tab-pane fade" id="folderTab" role="tabpanel">
+                <div class="card" style="border-top-left-radius:0;border-top-right-radius:0;border-top:0">
+                    <div class="card-body">
+                        <form asp-action="CreateFromFolder" method="post" id="folderForm">
+                            @Html.AntiForgeryToken()
+
+                            <div id="folderErrors" class="alert alert-danger" style="display:none"></div>
+
+                            <div class="alert alert-info d-flex align-items-center py-2 mb-3">
+                                <i class="fas fa-tag me-2"></i>
+                                <span class="small">Job ID is <strong>auto-generated</strong> — no input needed.</span>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Job Name <span class="text-danger">*</span></label>
+                                <input type="text" name="JobName" class="form-control" placeholder="e.g. Loan Onboarding - Batch 001" required />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Description</label>
+                                <textarea name="Description" class="form-control" rows="2" placeholder="Optional description"></textarea>
+                            </div>
+
+                            <!-- Folder path + scan button -->
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Input Folder Path <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <input type="text" id="folderPathInput" name="FolderPath" class="form-control"
+                                           placeholder="e.g. C:\Data\MyBatch" required />
+                                    <button type="button" class="btn btn-outline-primary" id="scanBtn" onclick="scanFolder()">
+                                        <i class="fas fa-search me-1"></i>Scan
+                                    </button>
+                                </div>
+                                <div class="form-text text-muted">Enter the full local server path to the folder.</div>
+                            </div>
+
+                            <!-- Naming convention reference card -->
+                            <div class="alert alert-secondary py-2 small mb-3">
+                                <strong><i class="fas fa-info-circle me-1"></i>Auto-classification by filename prefix (case-insensitive):</strong><br />
+                                <span class="me-3"><code>src_*</code> / <code>source_*</code> → <strong>Source</strong></span>
+                                <span class="me-3"><code>tgt_*</code> / <code>target_*</code> → <strong>Target Schema</strong></span>
+                                <span class="me-3"><code>hist_*</code> / <code>historic_*</code> / <code>historical_*</code> → <strong>Historical Mappings</strong></span>
+                                <span class="me-3"><code>rules_*</code> / <code>mapping_rules_*</code> → <strong>Mapping Rules</strong></span>
+                                <span class="me-3"><code>src_param_*</code> → <strong>Source Parameter File</strong></span>
+                                <span class="me-3"><code>tgt_param_*</code> → <strong>Target Parameter File</strong></span>
+                                <span class="me-3"><code>vm_*</code> / <code>value_mapping_*</code> → <strong>Value Mapping Excel Seed</strong></span>
+                                <span class="text-muted">Files with no recognised prefix are shown as <em>Unclassified</em> for manual assignment.</span>
+                            </div>
+
+                            <!-- Scan results panel (hidden until scan) -->
+                            <div id="scanResultsPanel" style="display:none">
+
+                                <h5 class="border-bottom pb-2 mb-3">
+                                    <i class="fas fa-list-check me-2"></i>Detected Files
+                                    <span id="scanSummaryBadge" class="badge bg-secondary ms-2 small fw-normal"></span>
+                                </h5>
+
+                                <!-- Classified datasets -->
+                                <div id="classifiedSection">
+                                    <h6 class="text-success mb-2"><i class="fas fa-check-circle me-1"></i>Classified Datasets</h6>
+                                    <div class="table-responsive mb-3">
+                                        <table class="table table-sm table-bordered align-middle">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th style="width:34px"><input type="checkbox" id="selectAllClassified" onchange="toggleAll('classified-check',this)" checked title="Select all" /></th>
+                                                    <th>File</th>
+                                                    <th style="width:70px">Size</th>
+                                                    <th style="width:180px">Role</th>
+                                                    <th style="width:150px">Dataset ID</th>
+                                                    <th style="width:90px">Type</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="classifiedBody"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- Parameter files -->
+                                <div id="paramSection" style="display:none">
+                                    <h6 class="text-info mb-2"><i class="fas fa-file-excel me-1"></i>Parameter Files <span class="badge bg-info text-dark ms-1">Auto-included</span></h6>
+                                    <div id="paramFilesBody" class="mb-3 small"></div>
+                                </div>
+
+                                <!-- Value mapping seed file -->
+                                <div id="valueMappingSeedSection" style="display:none">
+                                    <h6 class="text-success mb-2"><i class="fas fa-seedling me-1"></i>Value Mapping Seed File <span class="badge bg-success ms-1">Auto-included</span></h6>
+                                    <div id="valueMappingSeedBody" class="mb-3 small"></div>
+                                </div>
+
+                                <!-- Unclassified files -->
+                                <div id="unclassifiedSection" style="display:none">
+                                    <h6 class="text-warning mb-2">
+                                        <i class="fas fa-question-circle me-1"></i>Unclassified Files
+                                        <span class="text-muted fw-normal small ms-1">— no recognised prefix; assign a role to include, or leave unchecked to skip</span>
+                                    </h6>
+                                    <div class="table-responsive mb-3">
+                                        <table class="table table-sm table-bordered align-middle">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th style="width:34px"><input type="checkbox" id="selectAllUnclassified" onchange="toggleAll('unclassified-check',this)" title="Select all" /></th>
+                                                    <th>File</th>
+                                                    <th style="width:70px">Size</th>
+                                                    <th style="width:180px">Assign Role</th>
+                                                    <th style="width:150px">Dataset ID</th>
+                                                    <th style="width:90px">Type</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="unclassifiedBody"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- Unsupported files warning -->
+                                <div id="unsupportedSection" class="alert alert-warning py-2 small" style="display:none">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>
+                                    <strong>Unsupported file types (skipped):</strong> <span id="unsupportedList"></span>
+                                </div>
+
+                                <div class="d-grid mt-3">
+                                    <button type="submit" class="btn btn-primary btn-lg">
+                                        <i class="fas fa-play me-2"></i>Start Workflow
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Hidden dataset inputs — populated by JS on submit -->
+                            <div id="hiddenDatasetInputs"></div>
+                            <input type="hidden" id="sourceParamInput" name="SourceParameterFilePath" value="" />
+                            <input type="hidden" id="targetParamInput" name="TargetParameterFilePath" value="" />
+                            <input type="hidden" id="valueMappingsExcelInput" name="ValueMappingsExcelFilePath" value="" />
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /tab-content -->
+    </div><!-- /col-md-8 -->
+
+    <div class="col-md-4">
+        <!-- Workflow Phases accordion -->
+        <div class="card mb-3">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 fw-bold"><i class="fas fa-stream me-1 text-primary"></i>Workflow Phases</h6>
+                <small class="text-muted">14 steps · 5 phases</small>
+            </div>
+            <div class="card-body p-2">
+                <div class="accordion accordion-flush" id="stepsAccordion">
+
+                    <div class="accordion-item border-bottom">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed py-2 px-3 small" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#phase1">
+                                <span class="badge bg-primary me-2">1–3</span>
+                                <span class="fw-semibold">Ingestion &amp; Registration</span>
+                            </button>
+                        </h2>
+                        <div id="phase1" class="accordion-collapse collapse" data-bs-parent="#stepsAccordion">
+                            <div class="accordion-body py-1 px-3">
+                                <ol class="small ps-3 mb-1" start="1">
+                                    <li>Dataset Registration</li>
+                                    <li>File Ingestion</li>
+                                    <li>Source Schema Profiling</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item border-bottom">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed py-2 px-3 small" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#phase2">
+                                <span class="badge bg-info text-dark me-2">4–5</span>
+                                <span class="fw-semibold">Schema Analysis</span>
+                            </button>
+                        </h2>
+                        <div id="phase2" class="accordion-collapse collapse" data-bs-parent="#stepsAccordion">
+                            <div class="accordion-body py-1 px-3">
+                                <ol class="small ps-3 mb-1" start="4">
+                                    <li>Target Metadata Extraction</li>
+                                    <li>Semantic Schema Enrichment</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item border-bottom">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed py-2 px-3 small" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#phase3">
+                                <span class="badge bg-warning text-dark me-2">6–10</span>
+                                <span class="fw-semibold">Mapping &amp; AI Intelligence</span>
+                            </button>
+                        </h2>
+                        <div id="phase3" class="accordion-collapse collapse" data-bs-parent="#stepsAccordion">
+                            <div class="accordion-body py-1 px-3">
+                                <ol class="small ps-3 mb-1" start="6">
+                                    <li>Deterministic Mapping</li>
+                                    <li>AI Semantic Mapping</li>
+                                    <li>Relationship Resolution</li>
+                                    <li>Canonical Data Model Construction</li>
+                                    <li>Mapping Consolidation</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item border-bottom">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed py-2 px-3 small" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#phase4">
+                                <span class="badge bg-success me-2">11–12</span>
+                                <span class="fw-semibold">Transformation &amp; Output</span>
+                            </button>
+                        </h2>
+                        <div id="phase4" class="accordion-collapse collapse" data-bs-parent="#stepsAccordion">
+                            <div class="accordion-body py-1 px-3">
+                                <ol class="small ps-3 mb-1" start="11">
+                                    <li>Transformation Execution</li>
+                                    <li>Target File Generation</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed py-2 px-3 small" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#phase5">
+                                <span class="badge bg-secondary me-2">13–14</span>
+                                <span class="fw-semibold">Reconciliation &amp; Reporting</span>
+                            </button>
+                        </h2>
+                        <div id="phase5" class="accordion-collapse collapse" data-bs-parent="#stepsAccordion">
+                            <div class="accordion-body py-1 px-3">
+                                <ol class="small ps-3 mb-1" start="13">
+                                    <li>Reconciliation &amp; Validation</li>
+                                    <li>Reporting &amp; Audit Generation</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- Supported Dataset Roles -->
+        <div class="card">
+            <div class="card-body">
+                <h6 class="fw-bold"><i class="fas fa-lightbulb me-1 text-warning"></i>Supported Dataset Roles</h6>
+                <ul class="small ps-3 mb-0">
+                    <li><strong>SOURCE</strong> – CSV source data file</li>
+                    <li><strong>TARGET_SCHEMA</strong> – Excel <em>or</em> CSV schema definition</li>
+                    <li><strong>HISTORICAL_MAPPINGS</strong> – JSON historical mapping file</li>
+                    <li><strong>MAPPING_RULES</strong> – CSV file with custom field mapping rules</li>
+                </ul>
+            </div>
+        </div>
+
+            <!-- Optional Parameter Files -->
+            <div class="card mt-3">
+                <div class="card-header bg-white">
+                    <h6 class="fw-bold mb-0"><i class="fas fa-file-excel me-1 text-success"></i>Parameter Files <span class="badge bg-secondary ms-1 small">Optional</span></h6>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted mb-3">Upload optional parameter reference files (.xlsx) to improve value mapping discovery. These are used by the AI Value Mapping Agent to infer coded-value translations (e.g. Y → Active, 3 → Death).</p>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Source Parameter File <span class="text-muted fw-normal">(.xlsx)</span></label>
+                        <input type="file" name="SourceParameterFile" form="workflowForm" class="form-control form-control-sm" accept=".xlsx,.xls" />
+                        <div class="form-text text-muted">Contains source system coded values with descriptions.</div>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label small fw-semibold">Target Parameter File <span class="text-muted fw-normal">(.xlsx)</span></label>
+                        <input type="file" name="TargetParameterFile" form="workflowForm" class="form-control form-control-sm" accept=".xlsx,.xls" />
+                        <div class="form-text text-muted">Contains target system allowed values with business descriptions.</div>
+                    </div>
+                    <hr class="my-3" />
+                    <div class="mb-0">
+                        <label class="form-label small fw-semibold">Value Mappings Seed Excel <span class="text-muted fw-normal">(.xlsx)</span></label>
+                        <input type="file" name="ValueMappingsExcelFile" form="workflowForm" class="form-control form-control-sm" accept=".xlsx,.xls" />
+                        <div class="form-text text-muted">Optional mapping workbook to reuse later in Value Mapping Editor (Import Uploaded Excel).</div>
+                    </div>
+                </div>
+            </div>
+    </div>
+</div>
+
+<template id="datasetTemplate">
+    <div class="card mb-3 dataset-entry border-0 bg-light">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <h6 class="mb-0 fw-semibold"><i class="fas fa-file me-2"></i>Dataset {INDEX}</h6>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeDataset(this)">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="row g-2">
+                <div class="col-md-6">
+                    <label class="form-label small">Dataset Role <span class="text-danger">*</span></label>
+                    <select name="Datasets[{INDEX}].DatasetRole" class="form-select form-select-sm" required
+                            onchange="updateDatasetFromRole(this, '{INDEX}')">
+                        <option value="">-- Select Role --</option>
+                        <option value="SOURCE">SOURCE (CSV)</option>
+                        <option value="TARGET_SCHEMA">TARGET_SCHEMA (Excel / CSV)</option>
+                        <option value="HISTORICAL_MAPPINGS">HISTORICAL_MAPPINGS (JSON)</option>
+                        <option value="MAPPING_RULES">MAPPING_RULES (CSV)</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">Dataset ID <span class="text-danger">*</span></label>
+                    <input type="text" name="Datasets[{INDEX}].DatasetId" id="datasetId_{INDEX}"
+                           class="form-control form-control-sm" placeholder="Auto-filled on role select" required />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">Dataset Type <span class="text-danger">*</span></label>
+                    <select name="Datasets[{INDEX}].DatasetType" id="datasetType_{INDEX}"
+                            class="form-select form-select-sm dataset-type" required>
+                        <option value="CSV">CSV</option>
+                        <option value="EXCEL">EXCEL</option>
+                        <option value="JSON">JSON</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">Alias</label>
+                    <input type="text" name="Datasets[{INDEX}].DatasetAlias" class="form-control form-control-sm"
+                           placeholder="e.g. CUSTOMER" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">Domain</label>
+                    <input type="text" name="Datasets[{INDEX}].DatasetDomain" class="form-control form-control-sm"
+                           placeholder="e.g. CUSTOMER_DOMAIN" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label small">File <span class="text-danger">*</span></label>
+                    <input type="file" name="Datasets[{INDEX}].File" id="datasetFile_{INDEX}"
+                           class="form-control form-control-sm" required />
+                    <div id="fileHint_{INDEX}" class="form-text text-muted small mt-1"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+@section Scripts {
+<script>
+    // ══════════════════════════════════════════════════════════════════════════
+    //  TAB 1 — Upload Individual Files
+    // ══════════════════════════════════════════════════════════════════════════
+    let datasetCount = 0;
+
+    function addDataset() {
+        const idx = datasetCount;
+        const template = document.getElementById('datasetTemplate').innerHTML;
+        const html = template.replaceAll('{INDEX}', idx);
+        document.getElementById('datasetsContainer').insertAdjacentHTML('beforeend', html);
+        datasetCount++;
+    }
+
+    function removeDataset(btn) {
+        btn.closest('.dataset-entry').remove();
+    }
+
+    function updateDatasetFromRole(select, idx) {
+        const role       = select.value;
+        const typeSelect = document.getElementById('datasetType_' + idx);
+        const idInput    = document.getElementById('datasetId_' + idx);
+        const fileInput  = document.getElementById('datasetFile_' + idx);
+        const fileHint   = document.getElementById('fileHint_' + idx);
+
+        if (role === 'SOURCE') {
+            typeSelect.value = 'CSV';
+            if (!idInput.value) idInput.value = 'SRC_DATA';
+            fileInput.accept = '.csv';
+            fileHint.textContent = 'Accepted: .csv';
+        } else if (role === 'TARGET_SCHEMA') {
+            typeSelect.value = 'EXCEL';
+            if (!idInput.value) idInput.value = 'TGT_SCHEMA';
+            fileInput.accept = '.xlsx,.xls,.csv';
+            fileHint.innerHTML = 'Accepted: <strong>.xlsx / .xls</strong> or <strong>.csv</strong> — change Type to CSV if uploading a CSV schema.';
+        } else if (role === 'HISTORICAL_MAPPINGS') {
+            typeSelect.value = 'JSON';
+            if (!idInput.value) idInput.value = 'HIST_MAP';
+            fileInput.accept = '.json';
+            fileHint.textContent = 'Accepted: .json';
+        } else if (role === 'MAPPING_RULES') {
+            typeSelect.value = 'CSV';
+            if (!idInput.value) idInput.value = 'MAP_RULES';
+            fileInput.accept = '.csv';
+            fileHint.textContent = 'Accepted: .csv — expected columns: SourceField, TargetField, TransformationRule (optional)';
+        } else {
+            fileInput.accept = '';
+            fileHint.textContent = '';
+        }
+    }
+
+    // Add one dataset entry by default on page load
+    addDataset();
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  TAB 2 — Scan Folder
+    // ══════════════════════════════════════════════════════════════════════════
+
+    async function scanFolder() {
+        const folderPath = document.getElementById('folderPathInput').value.trim();
+        if (!folderPath) { showFolderError('Please enter a folder path.'); return; }
+
+        const btn = document.getElementById('scanBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Scanning…';
+        hideFolderError();
+
+        try {
+            const resp = await fetch('/Workflow/ScanFolder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ folderPath })
+            });
+
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({ error: 'Scan failed.' }));
+                showFolderError(err.error || 'Scan failed.');
+                return;
+            }
+
+            const data = await resp.json();
+            renderScanResults(data);
+        } catch (e) {
+            showFolderError('Network error: ' + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-search me-1"></i>Scan';
+        }
+    }
+
+    function renderScanResults(data) {
+        const classified   = data.filter(f => !f.isUnclassified && !f.isParameterFile && !f.isValueMappingFile && !f.isUnsupported);
+        const params       = data.filter(f => f.isParameterFile);
+        const valueMapSeed = data.filter(f => f.isValueMappingFile);
+        const unclassified = data.filter(f => f.isUnclassified);
+        const unsupported  = data.filter(f => f.isUnsupported);
+
+        // Summary badge
+        document.getElementById('scanSummaryBadge').textContent =
+            `${data.length} file(s) found`;
+
+        // ── Classified ──
+        const cb = document.getElementById('classifiedBody');
+        cb.innerHTML = classified.map(buildClassifiedRow).join('');
+        document.getElementById('classifiedSection').style.display = classified.length ? '' : 'none';
+
+        // ── Parameter files ──
+        let srcParam = '', tgtParam = '';
+        const pb = document.getElementById('paramFilesBody');
+        pb.innerHTML = params.map(f => {
+            const label = f.parameterFileRole === 'SOURCE'
+                ? '<span class="badge bg-info text-dark">Source Param</span>'
+                : '<span class="badge bg-primary">Target Param</span>';
+            if (f.parameterFileRole === 'SOURCE') srcParam = f.fileName;
+            else tgtParam = f.fileName;
+            return `<div class="d-flex align-items-center gap-2 mb-1">
+                        ${label}
+                        <span>${esc(f.fileName)}</span>
+                        <span class="text-muted">(${fmtBytes(f.fileSizeBytes)})</span>
+                        <span class="badge bg-success">Will be included</span>
+                    </div>`;
+        }).join('');
+        document.getElementById('sourceParamInput').value = srcParam;
+        document.getElementById('targetParamInput').value = tgtParam;
+        document.getElementById('paramSection').style.display = params.length ? '' : 'none';
+
+        // ── Value mapping seed file ──
+        let vmSeed = '';
+        const vmSeedBody = document.getElementById('valueMappingSeedBody');
+        vmSeedBody.innerHTML = valueMapSeed.map(f => {
+            vmSeed = vmSeed || f.fileName;
+            return `<div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="badge bg-success">Value Mapping Excel</span>
+                        <span>${esc(f.fileName)}</span>
+                        <span class="text-muted">(${fmtBytes(f.fileSizeBytes)})</span>
+                        <span class="badge bg-success">Will be included</span>
+                    </div>`;
+        }).join('');
+        document.getElementById('valueMappingsExcelInput').value = vmSeed;
+        document.getElementById('valueMappingSeedSection').style.display = valueMapSeed.length ? '' : 'none';
+
+        // ── Unclassified ──
+        const ub = document.getElementById('unclassifiedBody');
+        ub.innerHTML = unclassified.map(buildUnclassifiedRow).join('');
+        document.getElementById('unclassifiedSection').style.display = unclassified.length ? '' : 'none';
+
+        // ── Unsupported ──
+        if (unsupported.length) {
+            document.getElementById('unsupportedList').textContent = unsupported.map(f => f.fileName).join(', ');
+            document.getElementById('unsupportedSection').style.display = '';
+        } else {
+            document.getElementById('unsupportedSection').style.display = 'none';
+        }
+
+        document.getElementById('scanResultsPanel').style.display = '';
+    }
+
+    function buildClassifiedRow(f) {
+        const roleBadge = {
+            'SOURCE': 'bg-success',
+            'TARGET_SCHEMA': 'bg-primary',
+            'HISTORICAL_MAPPINGS': 'bg-warning text-dark',
+            'MAPPING_RULES': 'bg-secondary'
+        }[f.detectedRole] || 'bg-light text-dark';
+
+        return `<tr>
+            <td><input type="checkbox" class="classified-check" checked /></td>
+            <td class="small"><i class="fas fa-file me-1 text-muted"></i>${esc(f.fileName)}</td>
+            <td class="text-muted small">${fmtBytes(f.fileSizeBytes)}</td>
+            <td>${buildRoleSelect(f.detectedRole, f.fileName, 'classified')}</td>
+            <td><input type="text" class="form-control form-control-sm dataset-id-input" value="${esc(f.datasetId)}" /></td>
+            <td>${buildTypeSelect(f.datasetType)}</td>
+        </tr>`;
+    }
+
+    function buildUnclassifiedRow(f) {
+        return `<tr>
+            <td><input type="checkbox" class="unclassified-check" /></td>
+            <td class="small"><i class="fas fa-question-circle me-1 text-warning"></i>${esc(f.fileName)}</td>
+            <td class="text-muted small">${fmtBytes(f.fileSizeBytes)}</td>
+            <td>${buildRoleSelect('', f.fileName, 'unclassified')}</td>
+            <td><input type="text" class="form-control form-control-sm dataset-id-input" value="${esc(f.datasetId)}" /></td>
+            <td>${buildTypeSelect('CSV')}</td>
+        </tr>`;
+    }
+
+    function buildRoleSelect(selected, fileName, cssClass) {
+        const roles = ['SOURCE', 'TARGET_SCHEMA', 'HISTORICAL_MAPPINGS', 'MAPPING_RULES'];
+        const opts  = (cssClass === 'unclassified' ? '<option value="">-- Assign Role --</option>' : '')
+            + roles.map(r => `<option value="${r}"${r === selected ? ' selected' : ''}>${r}</option>`).join('');
+        return `<select class="form-select form-select-sm role-select ${cssClass}" data-file="${esc(fileName)}" onchange="onRoleChange(this)">${opts}</select>`;
+    }
+
+    function buildTypeSelect(selected) {
+        return '<select class="form-select form-select-sm type-select">'
+            + ['CSV', 'EXCEL', 'JSON'].map(t => `<option${t === selected ? ' selected' : ''}>${t}</option>`).join('')
+            + '</select>';
+    }
+
+    function onRoleChange(sel) {
+        const ts = sel.closest('tr').querySelector('.type-select');
+        const r  = sel.value;
+        ts.value = r === 'HISTORICAL_MAPPINGS' ? 'JSON' : r === 'TARGET_SCHEMA' ? 'EXCEL' : 'CSV';
+    }
+
+    function toggleAll(cls, masterCb) {
+        document.querySelectorAll('.' + cls).forEach(c => c.checked = masterCb.checked);
+    }
+
+    // Before submit: collect visible table rows into hidden inputs
+    document.getElementById('folderForm').addEventListener('submit', function () {
+        const container = document.getElementById('hiddenDatasetInputs');
+        container.innerHTML = '';
+        let idx = 0;
+
+        document.querySelectorAll('#classifiedBody tr').forEach(row => {
+            if (!row.querySelector('.classified-check')?.checked) return;
+            const role = row.querySelector('.role-select').value;
+            if (!role) return;
+            idx = appendHidden(container, idx,
+                row.querySelector('.role-select').dataset.file,
+                role,
+                row.querySelector('.dataset-id-input').value,
+                row.querySelector('.type-select').value);
+        });
+
+        document.querySelectorAll('#unclassifiedBody tr').forEach(row => {
+            if (!row.querySelector('.unclassified-check')?.checked) return;
+            const role = row.querySelector('.role-select').value;
+            if (!role) return;
+            idx = appendHidden(container, idx,
+                row.querySelector('.role-select').dataset.file,
+                role,
+                row.querySelector('.dataset-id-input').value,
+                row.querySelector('.type-select').value);
+        });
+    });
+
+    function appendHidden(cont, idx, fileName, role, datasetId, type) {
+        [['FileName', fileName], ['DatasetId', datasetId], ['DatasetRole', role], ['DatasetType', type]].forEach(([k, v]) => {
+            const inp = document.createElement('input');
+            inp.type  = 'hidden';
+            inp.name  = `Datasets[${idx}].${k}`;
+            inp.value = v;
+            cont.appendChild(inp);
+        });
+        return idx + 1;
+    }
+
+    // ── Helpers ──
+    function showFolderError(msg) {
+        const el = document.getElementById('folderErrors');
+        el.textContent = msg;
+        el.style.display = '';
+    }
+    function hideFolderError() {
+        document.getElementById('folderErrors').style.display = 'none';
+    }
+    function fmtBytes(b) {
+        if (b < 1024) return b + ' B';
+        if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+        return (b / 1048576).toFixed(1) + ' MB';
+    }
+    function esc(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+</script>
+}
+

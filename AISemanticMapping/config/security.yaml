@@ -1,0 +1,46 @@
+security:
+  enabled: true
+  bypass_authentication: true
+  bypass_authorization: true
+  demo_mode: true
+
+  api_key:
+    header_name: "X-API-Key"
+    # api_keys loaded from environment variable SEMANTIC_API_KEYS (comma-separated)
+
+  cors:
+    allow_origins:
+      - "*"
+    allow_methods:
+      - "GET"
+      - "POST"
+      - "OPTIONS"
+    allow_headers:
+      - "*"
+    allow_credentials: false
+
+  rate_limiting:
+    enabled: false
+    requests_per_minute: 100
+    burst_size: 20
+
+  audit:
+    log_all_requests: true
+    log_request_body: false
+    log_response_body: false
+    mask_sensitive_fields:
+      - "api_key"
+      - "password"
+      - "secret"
+      - "token"
+      - "account_number"
+      - "customer_id"
+      - "ssn"
+
+  sanitization:
+    enable_pii_masking: true
+    enable_prompt_sanitization: true
+    pii_patterns:
+      account_number: "\\b\\d{8,17}\\b"
+      ssn: "\\b\\d{3}-\\d{2}-\\d{4}\\b"
+      email: "[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}"

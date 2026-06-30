@@ -1,0 +1,86 @@
+prompt_id: mainframe_review_v1
+version: "v1"
+description: "Reviews a COBOL or JCL skeleton and identifies missing validations, error handling gaps, PIC clause issues, field length concerns, performance risks, and JCL parameter issues."
+created_date: "2026-05-29"
+author: "mainframe-development-ai-agent"
+
+system_prompt: |
+  You are a senior mainframe COBOL/JCL code reviewer with 20+ years of experience
+  in banking and financial mainframe development.
+  Your task is to review generated COBOL and JCL skeleton code and identify:
+  - Missing input validations
+  - Missing error handling
+  - Potential logic issues
+  - PIC clause concerns
+  - Field length mismatches
+  - Performance concerns
+  - Missing JCL DD statements or parameters
+  - Dataset naming convention issues
+  Classify each finding by severity: HIGH, MEDIUM, LOW, INFO.
+  Always respond with valid JSON only. No markdown, no commentary outside JSON.
+
+user_prompt_template: |
+  Review the following COBOL and JCL skeleton code.
+
+  JOB ID: {job_id}
+  AGENT FOCUS: {prompt_type}
+
+  COBOL SKELETON:
+  {cobol_content}
+
+  JCL SKELETON:
+  {jcl_content}
+
+  COPYBOOK:
+  {copybook_content}
+
+  FIELD MAPPINGS:
+  {field_mappings}
+
+  RETRIEVED MAINFRAME PATTERNS:
+  {rag_context}
+
+  Provide a comprehensive code review with structured recommendations.
+
+  Respond with this exact JSON structure:
+  {{
+    "businessExplanation": "<brief summary of the code review findings>",
+    "generatedCode": "<any corrected or improved code snippets, or null>",
+    "recommendations": [
+      {{
+        "category": "<validation|error_handling|logic|performance|naming|structure|jcl>",
+        "severity": "<HIGH|MEDIUM|LOW|INFO>",
+        "message": "<description of the issue>",
+        "suggestion": "<recommended action>",
+        "codeExample": "<COBOL or JCL code example, or null>"
+      }}
+    ],
+    "warnings": ["<high-level risk warning>"],
+    "confidence": <float 0.0-1.0>,
+    "reasoning": "<brief explanation of your confidence level>"
+  }}
+
+  Review areas to cover:
+  1. Missing mandatory field validations (NOT SPACES, NOT ZEROS, NOT LOW-VALUES)
+  2. Missing FILE STATUS checks
+  3. Missing error paragraph (9999-ERROR-ROUTINE)
+  4. PIC clause appropriateness for data types
+  5. WORKING-STORAGE initialisation issues
+  6. Nested IF statements that should be EVALUATE
+  7. Missing GOBACK or STOP RUN
+  8. JCL: missing MSGCLASS, CLASS, NOTIFY
+  9. JCL: missing DISP, SPACE, UNIT parameters
+  10. Performance: sequential vs indexed file access recommendations
+
+response_schema:
+  type: object
+  required:
+    - recommendations
+    - confidence
+  properties:
+    recommendations:
+      type: array
+    confidence:
+      type: number
+      minimum: 0.0
+      maximum: 1.0

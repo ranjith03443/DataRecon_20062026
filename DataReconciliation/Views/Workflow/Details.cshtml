@@ -1,0 +1,320 @@
+@model DataReconciliation.Application.DTOs.WorkflowDetailsDto
+@{
+    ViewData["Title"] = "Workflow Details - " + Model.Job.JobId;
+}
+
+<div class="d-flex align-items-center mb-4">
+    <a asp-action="Index" class="btn btn-outline-secondary me-3">
+        <i class="fas fa-arrow-left"></i>
+    </a>
+    <div>
+        <h2 class="mb-0">@Model.Job.JobName</h2>
+        <code class="text-muted small">@Model.Job.JobId</code>
+    </div>
+    <div class="ms-auto">
+        @{
+            var statusClass = Model.Job.Status switch
+            {
+                "Completed" => "success",
+                "InProgress" => "primary",
+                "Failed" => "danger",
+                "PartialSuccess" => "warning",
+                "AwaitingMappingApproval" => "warning",
+                _ => "secondary"
+            };
+        }
+        <span class="badge bg-@statusClass fs-6">@Model.Job.Status</span>
+    </div>
+</div>
+
+@if (Model.Job.Status == "AwaitingMappingApproval")
+{
+    <div class="alert alert-warning border-warning mb-4" role="alert">
+        <div class="d-flex align-items-start">
+            <i class="fas fa-exclamation-triangle fa-lg me-3 mt-1 text-warning"></i>
+            <div class="flex-grow-1">
+                <h5 class="alert-heading mb-1">Mapping Approval Required</h5>
+                <p class="mb-2">
+                    The mapping phase completed but one or more target fields are <strong>Unresolved</strong> or flagged
+                    <strong>Needs Review</strong>. The pipeline is paused here until you confirm the mappings.
+                </p>
+                <ol class="mb-3 ps-3 small">
+                    <li>Click <strong>Review &amp; Edit Mappings</strong> to open the mapping page and fix any unresolved fields.</li>
+                    <li>Save your changes on the mapping page.</li>
+                    <li>Return here and click <strong>Confirm &amp; Continue</strong> to resume transformation and reconciliation.</li>
+                </ol>
+                <div class="d-flex gap-2">
+                    <a asp-controller="Reports" asp-action="Mappings" asp-route-jobId="@Model.Job.JobId"
+                       class="btn btn-outline-warning btn-sm">
+                        <i class="fas fa-edit me-1"></i>Review &amp; Edit Mappings
+                    </a>
+                    <form asp-controller="Workflow" asp-action="ConfirmMappings" method="post" style="display:inline">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="jobId" value="@Model.Job.JobId" />
+                        <button type="submit" class="btn btn-success btn-sm">
+                            <i class="fas fa-play me-1"></i>Confirm &amp; Continue
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+    <!-- Step Timeline -->
+    <div class="col-md-5">
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-stream me-2"></i>Workflow Progress</h5>
+            </div>
+            <div class="card-body p-2">
+                @if (!Model.Steps.Any())
+                {
+                    <p class="text-muted small px-2">Workflow steps will appear here as they execute.</p>
+                }
+                @{
+                    // Define the 5 phases and their step names (match WorkflowStep enum string values)
+                    var phases = new[]
+                    {
+                        new { Name = "Ingestion & Registration", Color = "primary",  Range = "1–3",  Steps = new[] { "DatasetRegistration", "FileIngestion", "SourceSchemaProfiling" } },
+                        new { Name = "Schema Analysis",          Color = "info",     Range = "4–5",  Steps = new[] { "TargetMetadataExtraction", "SemanticSchemaEnrichment" } },
+                        new { Name = "Mapping & AI",             Color = "warning",  Range = "6–10", Steps = new[] { "DeterministicMapping", "AISemanticMapping", "RelationshipResolution", "CanonicalDataModelConstruction", "MappingConsolidation" } },
+                        new { Name = "Transformation & Output",  Color = "success",  Range = "11–12",Steps = new[] { "TransformationExecution", "TargetFileGeneration" } },
+                        new { Name = "Reconciliation & Reporting",Color = "secondary",Range = "13–14",Steps = new[] { "ReconciliationValidation", "ReportingAuditGeneration" } }
+                    };
+                    int phaseIdx = 0;
+                }
+                <div class="accordion accordion-flush" id="phaseAccordion">
+                @foreach (var phase in phases)
+                {
+                    // For each unique step in the phase, get the latest (by StartedAt/CompletedAt) WorkflowStepDto
+                    var phaseStepDtos = Model.Steps.Where(s => phase.Steps.Contains(s.Step)).ToList();
+                    var latestStepDtos = phase.Steps
+                        .Select(stepName => phaseStepDtos
+                            .Where(s => s.Step == stepName)
+                            .OrderByDescending(s => s.CompletedAt ?? s.StartedAt ?? DateTime.MinValue)
+                            .FirstOrDefault())
+                        .Where(dto => dto != null)
+                        .ToList();
+                    int completedCount = latestStepDtos.Count(s => s.Status == "Completed");
+                    int totalInPhase   = phase.Steps.Length;
+                    bool anyFailed     = latestStepDtos.Any(s => s.Status == "Failed");
+                    bool anyRunning    = latestStepDtos.Any(s => s.Status == "Running");
+                    bool allCompleted  = completedCount == totalInPhase && totalInPhase > 0;
+
+                    var phaseBadgeColor = anyFailed ? "danger"
+                        : anyRunning  ? "primary"
+                        : allCompleted ? "success"
+                        : completedCount > 0 ? "warning"
+                        : "light text-dark";
+
+                    var phaseIcon = anyFailed ? "fas fa-times-circle text-danger"
+                        : anyRunning  ? "fas fa-spinner fa-spin text-primary"
+                        : allCompleted ? "fas fa-check-circle text-success"
+                        : completedCount > 0 ? "fas fa-hourglass-half text-warning"
+                        : "fas fa-circle text-muted";
+
+                    var collapseId = $"phaseCollapse{phaseIdx}";
+                    var progressPct = totalInPhase > 0 ? (completedCount * 100 / totalInPhase) : 0;
+                    phaseIdx++;
+                    <div class="accordion-item border-bottom">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button @(anyRunning || anyFailed ? "" : "collapsed") py-2 px-3 small"
+                                    type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId">
+                                <span class="me-2"><i class="@phaseIcon"></i></span>
+                                <span class="fw-semibold flex-grow-1">@phase.Name</span>
+                                <span class="badge bg-@phaseBadgeColor ms-2">@completedCount/@totalInPhase</span>
+                            </button>
+                        </h2>
+                        <div id="@collapseId" class="accordion-collapse collapse @(anyRunning || anyFailed ? "show" : "")">
+                            <div class="accordion-body p-2">
+                                @if (completedCount > 0 || anyRunning || anyFailed)
+                                {
+                                    <div class="progress mb-2" style="height:4px;">
+                                        <div class="progress-bar bg-@(anyFailed ? "danger" : phase.Color)"
+                                             style="width:@progressPct%"></div>
+                                    </div>
+                                }
+                                <div class="step-timeline">
+                                @foreach (var stepName in phase.Steps)
+                                {
+                                    var stepDto = phaseStepDtos.FirstOrDefault(s => s.Step == stepName);
+                                    var stepStatus = stepDto?.Status ?? "Pending";
+                                    var stepClass = stepStatus switch {
+                                        "Completed" => "completed",
+                                        "Running"   => "running",
+                                        "Failed"    => "failed",
+                                        _           => ""
+                                    };
+                                    var stepIcon = stepStatus switch {
+                                        "Completed" => "fas fa-check text-success",
+                                        "Running"   => "fas fa-spinner fa-spin text-primary",
+                                        "Failed"    => "fas fa-times text-danger",
+                                        _           => "fas fa-clock text-muted"
+                                    };
+                                    // Convert camelCase enum name to readable label
+                                    var label = System.Text.RegularExpressions.Regex.Replace(stepName, "([A-Z])", " $1").Trim();
+                                    <div class="step-item @stepClass">
+                                        <div class="d-flex justify-content-between">
+                                            <span class="fw-semibold small">
+                                                <i class="@stepIcon me-1"></i>@label
+                                            </span>
+                                            @if (stepDto?.DurationMs.HasValue == true)
+                                            {
+                                                <span class="text-muted small">@stepDto.DurationMs.Value.ToString("F0")ms</span>
+                                            }
+                                        </div>
+                                        @if (stepDto?.RetryCount > 0)
+                                        {
+                                            <span class="badge bg-warning text-dark small">Retried @stepDto.RetryCount×</span>
+                                        }
+                                        @if (!string.IsNullOrEmpty(stepDto?.ErrorDetails))
+                                        {
+                                            <div class="text-danger small mt-1">@stepDto.ErrorDetails</div>
+                                        }
+                                    </div>
+                                }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Artifacts & Actions -->
+    <div class="col-md-7">
+        <!-- Job Info -->
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-4 border-end">
+                        <div class="text-muted small">Started</div>
+                        <div class="fw-semibold small">@Model.Job.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</div>
+                    </div>
+                    <div class="col-4 border-end">
+                        <div class="text-muted small">Current Step</div>
+                        <div class="fw-semibold small">@Model.Job.CurrentStep</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="text-muted small">Completed</div>
+                        <div class="fw-semibold small">@(Model.Job.CompletedAt?.ToString("HH:mm:ss") ?? "-")</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(Model.Job.ErrorDetails))
+        {
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Error:</strong> @Model.Job.ErrorDetails
+            </div>
+        }
+
+        <!-- Actions -->
+        <div class="card mb-3">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-tools me-2"></i>Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex gap-2 flex-wrap">
+                    <a asp-controller="Reports" asp-action="Reconciliation" asp-route-jobId="@Model.Job.JobId"
+                       class="btn btn-outline-info btn-sm">
+                        <i class="fas fa-balance-scale me-1"></i>Reconciliation Report
+                    </a>
+                    <a asp-controller="Reports" asp-action="Mappings" asp-route-jobId="@Model.Job.JobId"
+                       class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-link me-1"></i>View Mappings
+                    </a>
+                    <a asp-controller="Reports" asp-action="AIAudit" asp-route-jobId="@Model.Job.JobId"
+                       class="btn btn-outline-warning btn-sm">
+                        <i class="fas fa-robot me-1"></i>AI Audit
+                    </a>
+                    <a asp-controller="Reports" asp-action="ErrorLog" asp-route-jobId="@Model.Job.JobId"
+                       class="btn btn-outline-danger btn-sm">
+                        <i class="fas fa-bug me-1"></i>Error Log
+                    </a>
+                </div>
+                @if (Model.Job.Status != "Pending")
+                {
+                    <hr />
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <form asp-action="Replay" method="post" class="d-flex align-items-center gap-2">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="jobId" value="@Model.Job.JobId" />
+                            <select name="fromStep" class="form-select form-select-sm" style="width:auto">
+                                <option value="DatasetRegistration">Step 1 — Dataset Registration</option>
+                                <option value="FileIngestion">Step 2 — File Ingestion</option>
+                                <option value="SourceSchemaProfiling">Step 3 — Source Schema Profiling</option>
+                                <option value="TargetMetadataExtraction">Step 4 — Target Metadata Extraction</option>
+                                <option value="SemanticSchemaEnrichment">Step 5 — Semantic Schema Enrichment (AI)</option>
+                                <option value="DeterministicMapping">Step 6 — Deterministic Mapping</option>
+                                <option value="AISemanticMapping" selected>Step 7 — AI Semantic Mapping (AI)</option>
+                                <option value="RelationshipResolution">Step 8 — Relationship Resolution</option>
+                                <option value="CanonicalDataModelConstruction">Step 9 — Canonical Data Model</option>
+                                <option value="MappingConsolidation">Step 10 — Mapping Consolidation</option>
+                                <option value="TransformationExecution">Step 11 — Transformation Execution</option>
+                                <option value="TargetFileGeneration">Step 12 — Target File Generation</option>
+                                <option value="ReconciliationValidation">Step 13 — Reconciliation Validation</option>
+                                <option value="ReportingAuditGeneration">Step 14 — Reporting &amp; Audit</option>
+                            </select>
+                            <button type="submit" class="btn btn-warning btn-sm">
+                                <i class="fas fa-redo me-1"></i>Re-run from Step
+                            </button>
+                        </form>
+                    </div>
+                    <div class="text-muted small mt-2">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Re-runs the selected step and all steps after it. Existing artifacts will be overwritten.
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Artifacts -->
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-file-archive me-2"></i>Artifacts</h5>
+            </div>
+            @if (!Model.Artifacts.Any())
+            {
+                <div class="card-body text-muted small">Artifacts will appear as they are generated.</div>
+            }
+            else
+            {
+                <div class="list-group list-group-flush">
+                    @foreach (var artifact in Model.Artifacts)
+                    {
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="fas fa-file-code me-2 text-muted"></i>
+                                <span class="small fw-semibold">@artifact.ArtifactName</span>
+                                <span class="badge bg-secondary ms-2 small">@artifact.ArtifactType</span>
+                            </div>
+                            <a asp-action="DownloadArtifact"
+                               asp-route-jobId="@Model.Job.JobId"
+                               asp-route-artifactType="@artifact.ArtifactType"
+                               class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-download"></i>
+                            </a>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    // Auto-refresh if workflow is running
+    @if (Model.Job.Status == "InProgress")
+    {
+        <text>
+        setTimeout(() => window.location.reload(), 5000);
+        </text>
+    }
+</script>
+}

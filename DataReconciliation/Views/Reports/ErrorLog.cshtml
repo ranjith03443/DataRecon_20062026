@@ -1,0 +1,44 @@
+@model List<DataReconciliation.Domain.Entities.ErrorAuditLog>
+@{
+    ViewData["Title"] = "Error Log";
+    var jobId = ViewBag.JobId as string ?? "";
+}
+
+<div class="d-flex align-items-center mb-4">
+    <a asp-controller="Workflow" asp-action="Details" asp-route-jobId="@jobId" class="btn btn-outline-secondary me-3">
+        <i class="fas fa-arrow-left"></i>
+    </a>
+    <h2 class="mb-0"><i class="fas fa-bug me-2 text-danger"></i>Error Log</h2>
+    <code class="ms-3 text-muted">@jobId</code>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-success"><i class="fas fa-check-circle me-2"></i>No errors recorded for this job.</div>
+}
+else
+{
+    foreach (var error in Model)
+    {
+        <div class="card mb-3 border-danger-subtle">
+            <div class="card-header bg-danger-subtle d-flex justify-content-between">
+                <span><i class="fas fa-exclamation-circle text-danger me-2"></i><strong>@error.ErrorCode</strong></span>
+                <span class="small text-muted">@error.OccurredAt.ToString("yyyy-MM-dd HH:mm:ss")</span>
+            </div>
+            <div class="card-body">
+                <p class="mb-1"><strong>Message:</strong> @error.ErrorMessage</p>
+                @if (error.Step.HasValue)
+                {
+                    <p class="mb-1"><strong>Step:</strong> <span class="badge bg-secondary">@error.Step</span></p>
+                }
+                @if (!string.IsNullOrEmpty(error.StackTrace))
+                {
+                    <details>
+                        <summary class="small text-muted">Stack Trace</summary>
+                        <pre class="small bg-light p-2 mt-2">@error.StackTrace</pre>
+                    </details>
+                }
+            </div>
+        </div>
+    }
+}

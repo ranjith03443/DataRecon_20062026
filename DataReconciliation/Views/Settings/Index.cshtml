@@ -1,0 +1,630 @@
+@model DataReconciliation.Application.DTOs.AISettingsDto
+@{
+    ViewData["Title"] = "AI Settings";
+    var envPath = ViewBag.PythonEnvPath as string;
+}
+
+<div class="d-flex align-items-center mb-4">
+    <h2 class="mb-0"><i class="fas fa-sliders-h me-2 text-primary"></i>AI Settings</h2>
+    <span class="badge bg-secondary ms-3">config/ai_settings.json</span>
+</div>
+
+<div class="alert alert-info d-flex align-items-start py-2 mb-4">
+    <i class="fas fa-info-circle me-2 mt-1"></i>
+    <div>
+        Changes are saved to <code>config/ai_settings.json</code> and synced to the Python service
+        <code>@(string.IsNullOrEmpty(envPath) ? "AISemanticMapping/.env (not found)" : envPath)</code>.
+        <strong>Restart the Python service</strong> after saving for changes to take effect.
+    </div>
+</div>
+
+<form asp-action="Save" method="post" id="settingsForm">
+    @Html.AntiForgeryToken()
+
+    <div class="row">
+        <!-- Left column: tabs -->
+        <div class="col-md-9">
+
+            <ul class="nav nav-tabs mb-0" id="settingsTabs" role="tablist">
+                <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabProvider" type="button"><i class="fas fa-plug me-1"></i>Provider &amp; Keys</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabModels" type="button"><i class="fas fa-brain me-1"></i>Models</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabEmbedding" type="button"><i class="fas fa-vector-square me-1"></i>Embeddings</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabConnection" type="button"><i class="fas fa-network-wired me-1"></i>Connection</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabBudget" type="button"><i class="fas fa-coins me-1"></i>Budget</button></li>
+            </ul>
+
+            <div class="tab-content">
+
+                <!-- ── Tab 1: Provider & Keys ───────────────────────────── -->
+                <div class="tab-pane fade show active" id="tabProvider">
+                    <div class="card" style="border-top-left-radius:0;border-top:0">
+                        <div class="card-body">
+
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold">LLM Provider</label>
+                                <select asp-for="LlmProvider" class="form-select" id="providerSelect">
+                                    <option value="claude">Anthropic Claude</option>
+                                    <option value="openai">OpenAI</option>
+                                    <option value="azure_openai">Azure OpenAI</option>
+                                    <option value="ollama">Ollama (Local)</option>
+                                    <option value="gemini">Google Gemini</option>
+                                    <option value="mistral">Mistral AI</option>
+                                </select>
+                                <div class="form-text">Selects which LLM is used for semantic mapping, schema enrichment, and rule inference.</div>
+                            </div>
+
+                            <!-- Claude -->
+                            <div class="provider-section" id="section-claude">
+                                <h6 class="text-muted border-bottom pb-1 mb-3"><i class="fas fa-robot me-1"></i>Anthropic Claude</h6>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">API Key</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-key"></i></span>
+                                        <input asp-for="AnthropicApiKey" class="form-control font-monospace" type="password" placeholder="sk-ant-api03-..." autocomplete="off" />
+                                        <button class="btn btn-outline-secondary toggle-password" type="button" data-target="AnthropicApiKey"><i class="fas fa-eye"></i></button>
+                                    </div>
+                                    <div class="form-text">Get your key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></div>
+                                </div>
+                            </div>
+
+                            <!-- OpenAI -->
+                            <div class="provider-section" id="section-openai">
+                                <h6 class="text-muted border-bottom pb-1 mb-3"><i class="fas fa-robot me-1"></i>OpenAI</h6>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">API Key</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-key"></i></span>
+                                        <input asp-for="OpenAiApiKey" class="form-control font-monospace" type="password" placeholder="sk-..." autocomplete="off" />
+                                        <button class="btn btn-outline-secondary toggle-password" type="button" data-target="OpenAiApiKey"><i class="fas fa-eye"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Azure OpenAI -->
+                            <div class="provider-section" id="section-azure_openai">
+                                <h6 class="text-muted border-bottom pb-1 mb-3"><i class="fab fa-microsoft me-1"></i>Azure OpenAI</h6>
+                                <div class="row g-3">
+                                    <div class="col-md-8">
+                                        <label class="form-label fw-semibold">Endpoint</label>
+                                        <input asp-for="AzureOpenAiEndpoint" class="form-control" placeholder="https://your-resource.openai.azure.com/" />
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">API Version</label>
+                                        <input asp-for="AzureOpenAiApiVersion" class="form-control" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold">API Key</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-key"></i></span>
+                                            <input asp-for="AzureOpenAiApiKey" class="form-control font-monospace" type="password" autocomplete="off" />
+                                            <button class="btn btn-outline-secondary toggle-password" type="button" data-target="AzureOpenAiApiKey"><i class="fas fa-eye"></i></button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold">Chat Deployment Name</label>
+                                        <input asp-for="AzureOpenAiDeploymentName" class="form-control" placeholder="gpt-4o-mini" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Ollama -->
+                            <div class="provider-section" id="section-ollama">
+                                <h6 class="text-muted border-bottom pb-1 mb-3"><i class="fas fa-server me-1"></i>Ollama (Local)</h6>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold">Ollama Base URL</label>
+                                        <input asp-for="OllamaBaseUrl" class="form-control" placeholder="http://localhost:11434" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold">Default Model</label>
+                                        <input asp-for="OllamaDefaultModel" class="form-control" placeholder="llama3" />
+                                    </div>
+                                </div>
+                                <div class="form-text mt-2"><i class="fas fa-info-circle me-1"></i>Ollama must be running locally. Pull a model first: <code>ollama pull llama3</code></div>
+                            </div>
+
+                            <!-- Gemini -->
+                            <div class="provider-section" id="section-gemini">
+                                <h6 class="text-muted border-bottom pb-1 mb-3"><i class="fas fa-gem me-1"></i>Google Gemini</h6>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">API Key</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-key"></i></span>
+                                        <input asp-for="GeminiApiKey" class="form-control font-monospace" type="password" placeholder="AIza..." autocomplete="off" />
+                                        <button class="btn btn-outline-secondary toggle-password" type="button" data-target="GeminiApiKey"><i class="fas fa-eye"></i></button>
+                                    </div>
+                                    <div class="form-text">Get your key at <a href="https://aistudio.google.com" target="_blank">aistudio.google.com</a></div>
+                                </div>
+                            </div>
+
+                            <!-- Mistral AI -->
+                            <div class="provider-section" id="section-mistral">
+                                <h6 class="text-muted border-bottom pb-1 mb-3"><i class="fas fa-wind me-1"></i>Mistral AI</h6>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">API Key</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-key"></i></span>
+                                        <input asp-for="MistralApiKey" class="form-control font-monospace" type="password" placeholder="..." autocomplete="off" />
+                                        <button class="btn btn-outline-secondary toggle-password" type="button" data-target="MistralApiKey"><i class="fas fa-eye"></i></button>
+                                    </div>
+                                    <div class="form-text">Get your key at <a href="https://console.mistral.ai" target="_blank">console.mistral.ai</a></div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Base URL <span class="text-muted fw-normal">(optional override)</span></label>
+                                    <input asp-for="MistralBaseUrl" class="form-control font-monospace" placeholder="https://api.mistral.ai/v1" />
+                                    <div class="form-text">Leave as default unless you are using a self-hosted or proxy endpoint.</div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Tab 2: Models ────────────────────────────────────── -->
+                <div class="tab-pane fade" id="tabModels">
+                    <div class="card" style="border-top-left-radius:0;border-top:0">
+                        <div class="card-body">
+                            <p class="text-muted small mb-4">Model name must match the selected provider. Examples: <code>claude-haiku-4-5-20251001</code> · <code>gpt-4o-mini</code> · <code>gemini-1.5-flash</code> · <code>llama3</code></p>
+
+                            <div class="table-responsive">
+                                <table class="table table-bordered align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width:30%">Task</th>
+                                            <th>Model Name</th>
+                                            <th style="width:15%">Temperature</th>
+                                            <th style="width:15%">Max Tokens</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><span class="badge bg-primary">Semantic Mapping</span><div class="small text-muted mt-1">Source → Target field inference</div></td>
+                                            <td><input asp-for="SemanticMappingModel" class="form-control form-control-sm font-monospace" /></td>
+                                            <td><input asp-for="SemanticMappingTemperature" class="form-control form-control-sm" type="number" step="0.05" min="0" max="2" /></td>
+                                            <td><input asp-for="SemanticMappingMaxTokens" class="form-control form-control-sm" type="number" min="100" max="8000" /></td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge bg-info">Schema Enrichment</span><div class="small text-muted mt-1">Field meaning &amp; business category</div></td>
+                                            <td><input asp-for="SchemaEnrichmentModel" class="form-control form-control-sm font-monospace" /></td>
+                                            <td><input asp-for="SchemaEnrichmentTemperature" class="form-control form-control-sm" type="number" step="0.05" min="0" max="2" /></td>
+                                            <td><input asp-for="SchemaEnrichmentMaxTokens" class="form-control form-control-sm" type="number" min="100" max="8000" /></td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge bg-warning text-dark">Rule Inference</span><div class="small text-muted mt-1">Transformation rule parsing</div></td>
+                                            <td><input asp-for="RuleInferenceModel" class="form-control form-control-sm font-monospace" /></td>
+                                            <td><input asp-for="RuleInferenceTemperature" class="form-control form-control-sm" type="number" step="0.05" min="0" max="2" /></td>
+                                            <td><input asp-for="RuleInferenceMaxTokens" class="form-control form-control-sm" type="number" min="100" max="8000" /></td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge bg-dark">Mainframe Agent</span><div class="small text-muted mt-1">COBOL/JCL guidance</div></td>
+                                            <td><input asp-for="MainframeAgentModel" class="form-control form-control-sm font-monospace" /></td>
+                                            <td colspan="2" class="text-muted small">Uses provider defaults</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="alert alert-secondary mt-3 small mb-0">
+                                <strong>Quick model references</strong><br>
+                                Claude: <code>claude-haiku-4-5-20251001</code> · <code>claude-sonnet-4-6</code> · <code>claude-opus-4-8</code><br>
+                                OpenAI: <code>gpt-4o-mini</code> · <code>gpt-4o</code> · <code>gpt-4-turbo</code><br>
+                                Gemini: <code>gemini-1.5-flash</code> · <code>gemini-1.5-pro</code> · <code>gemini-2.0-flash</code><br>
+                                Mistral: <code>mistral-small-latest</code> · <code>mistral-medium-latest</code> · <code>mistral-large-latest</code><br>
+                                Ollama: <code>llama3</code> · <code>mistral</code> · <code>phi3</code> · <code>gemma2</code>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Tab 3: Embeddings ───────────────────────────────── -->
+                <div class="tab-pane fade" id="tabEmbedding">
+                    <div class="card" style="border-top-left-radius:0;border-top:0">
+                        <div class="card-body">
+                            <div class="alert alert-info small mb-4">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Embeddings are used for RAG (Retrieval-Augmented Generation). RAG is currently
+                                <strong>disabled</strong> in <code>config/app_config.yaml</code> so the embedding
+                                provider is not called during workflow execution.
+                            </div>
+
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label fw-semibold">Embedding Provider</label>
+                                    <select asp-for="EmbeddingProvider" class="form-select">
+                                        <option value="azure_openai">Azure OpenAI</option>
+                                        <option value="openai">OpenAI</option>
+                                        <option value="huggingface">HuggingFace</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-semibold">Embedding Model</label>
+                                    <input asp-for="EmbeddingModel" class="form-control font-monospace" placeholder="text-embedding-3-small" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-semibold">Dimensions</label>
+                                    <input asp-for="EmbeddingDimensions" class="form-control" type="number" min="256" max="4096" />
+                                </div>
+                                <div class="col-md-8">
+                                    <label class="form-label fw-semibold">Azure Embedding Deployment</label>
+                                    <input asp-for="AzureEmbeddingDeployment" class="form-control" placeholder="text-embedding-3-small" />
+                                    <div class="form-text">Only required when Embedding Provider is Azure OpenAI.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Tab 4: Connection ──────────────────────────────── -->
+                <div class="tab-pane fade" id="tabConnection">
+                    <div class="card" style="border-top-left-radius:0;border-top:0">
+                        <div class="card-body">
+
+                            <h6 class="border-bottom pb-2 mb-3">Python AI Service</h6>
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-8">
+                                    <label class="form-label fw-semibold">Base URL</label>
+                                    <div class="input-group">
+                                        <input asp-for="PythonServiceUrl" class="form-control font-monospace" placeholder="http://localhost:8000" />
+                                        <button class="btn btn-outline-primary" type="button" id="btnCheckHealth">
+                                            <i class="fas fa-heartbeat me-1"></i>Check Health
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 d-flex align-items-end">
+                                    <div id="healthResult" class="w-100"></div>
+                                </div>
+                            </div>
+                            <div class="alert alert-secondary small mb-4">
+                                Swagger UI: <code id="swaggerLink"></code><br>
+                                Python .env: <code>@(string.IsNullOrEmpty(envPath) ? "not found — update manually" : envPath)</code>
+                            </div>
+
+                            <h6 class="border-bottom pb-2 mb-3">AI Confidence Thresholds</h6>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label fw-semibold">
+                                        Auto-Accept
+                                        <span class="badge bg-success ms-1">≥ threshold</span>
+                                    </label>
+                                    <div class="input-group">
+                                        <input asp-for="AutoAcceptThreshold" class="form-control" type="number" step="0.05" min="0" max="1" />
+                                        <span class="input-group-text">0–1</span>
+                                    </div>
+                                    <div class="form-text">Mappings above this are accepted automatically.</div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-semibold">
+                                        Warning
+                                        <span class="badge bg-warning text-dark ms-1">≥ threshold</span>
+                                    </label>
+                                    <div class="input-group">
+                                        <input asp-for="WarningThreshold" class="form-control" type="number" step="0.05" min="0" max="1" />
+                                        <span class="input-group-text">0–1</span>
+                                    </div>
+                                    <div class="form-text">Mappings in this range need review.</div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-semibold">
+                                        Manual Review
+                                        <span class="badge bg-danger ms-1">&lt; warning</span>
+                                    </label>
+                                    <div class="form-control bg-light text-muted">Below warning threshold</div>
+                                    <div class="form-text">Always flagged for manual review.</div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Tab 5: Budget ──────────────────────────────────── -->
+                <div class="tab-pane fade" id="tabBudget">
+                    <div class="card" style="border-top-left-radius:0;border-top:0">
+                        <div class="card-body">
+
+                            <!-- Filters -->
+                            <div class="row g-2 align-items-end mb-4">
+                                <div class="col-auto">
+                                    <label class="form-label">From</label>
+                                    <input type="date" id="budgetFrom" class="form-control" />
+                                </div>
+                                <div class="col-auto">
+                                    <label class="form-label">To</label>
+                                    <input type="date" id="budgetTo" class="form-control" />
+                                </div>
+                                <div class="col-auto">
+                                    <label class="form-label">Provider</label>
+                                    <select id="budgetProvider" class="form-select">
+                                        <option value="">All Providers</option>
+                                        <option value="claude">Anthropic Claude</option>
+                                        <option value="openai">OpenAI</option>
+                                        <option value="azure_openai">Azure OpenAI</option>
+                                        <option value="gemini">Google Gemini</option>
+                                        <option value="mistral">Mistral AI</option>
+                                        <option value="ollama">Ollama (Local)</option>
+                                    </select>
+                                </div>
+                                <div class="col-auto">
+                                    <button type="button" class="btn btn-primary" id="btnLoadBudget">
+                                        <i class="fas fa-chart-line me-1"></i>Load
+                                    </button>
+                                </div>
+                                <div class="col-auto" id="budgetSpinner" style="display:none">
+                                    <span class="spinner-border spinner-border-sm text-primary"></span>
+                                </div>
+                            </div>
+
+                            <!-- Summary tiles -->
+                            <div class="row g-3 mb-4" id="budgetSummary" style="display:none">
+                                <div class="col-md-4">
+                                    <div class="metric-tile text-center">
+                                        <div class="metric-label">Total API Calls</div>
+                                        <div class="metric-value" id="bTotalCalls">—</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="metric-tile text-center">
+                                        <div class="metric-label">Total Tokens</div>
+                                        <div class="metric-value" id="bTotalTokens">—</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="metric-tile text-center">
+                                        <div class="metric-label">Estimated Spend</div>
+                                        <div class="metric-value text-success" id="bTotalCost">—</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Per-provider breakdown -->
+                            <div id="budgetBreakdown" style="display:none">
+                                <h6 class="border-bottom pb-2 mb-2">Spend by Provider &amp; Model</h6>
+                                <div class="table-responsive mb-4">
+                                    <table class="table table-bordered table-sm" id="budgetProviderTable">
+                                        <thead>
+                                            <tr>
+                                                <th>Provider</th>
+                                                <th>Model</th>
+                                                <th class="text-end">Calls</th>
+                                                <th class="text-end">Input Tokens</th>
+                                                <th class="text-end">Output Tokens</th>
+                                                <th class="text-end">Total Tokens</th>
+                                                <th class="text-end">Est. Cost (USD)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="budgetProviderBody"></tbody>
+                                    </table>
+                                </div>
+
+                                <h6 class="border-bottom pb-2 mb-2">Recent Calls <span class="text-muted fw-normal small">(last 100)</span></h6>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-sm" id="budgetDetailTable">
+                                        <thead>
+                                            <tr>
+                                                <th>Timestamp</th>
+                                                <th>Provider</th>
+                                                <th>Model</th>
+                                                <th>Task</th>
+                                                <th class="text-end">In Tokens</th>
+                                                <th class="text-end">Out Tokens</th>
+                                                <th class="text-end">Cost (USD)</th>
+                                                <th class="text-end">Latency</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="budgetDetailBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div id="budgetEmpty" class="text-center text-muted py-4" style="display:none">
+                                <i class="fas fa-inbox fa-2x mb-2 d-block opacity-25"></i>
+                                No API calls recorded for the selected period.
+                            </div>
+
+                            <div id="budgetError" class="alert alert-danger" style="display:none"></div>
+
+                            <div class="alert alert-secondary small mb-0 mt-3">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Costs are <strong>estimates</strong> based on published token pricing. Actual billing may differ.
+                                Log file: <code>python_logs/budget_log.jsonl</code>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+            </div><!-- /tab-content -->
+        </div><!-- /col-md-9 -->
+
+        <!-- Right column: save panel -->
+        <div class="col-md-3">
+            <div class="card sticky-top" style="top:1rem">
+                <div class="card-header bg-primary text-white fw-semibold">
+                    <i class="fas fa-save me-1"></i>Save Settings
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted mb-3">Saves to <code>ai_settings.json</code> and syncs the Python service <code>.env</code> file.</p>
+                    <button type="submit" class="btn btn-primary w-100 mb-2">
+                        <i class="fas fa-save me-1"></i>Save All Settings
+                    </button>
+                    <a asp-action="Index" asp-controller="Workflow" class="btn btn-outline-secondary w-100 small">
+                        Cancel
+                    </a>
+                </div>
+                <div class="card-footer small text-muted">
+                    <i class="fas fa-exclamation-triangle me-1 text-warning"></i>
+                    Restart the Python service after saving.
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header fw-semibold small">
+                    <i class="fas fa-shield-alt me-1 text-success"></i>Security Notes
+                </div>
+                <div class="card-body small text-muted">
+                    <ul class="ps-3 mb-0">
+                        <li>API keys are stored in <code>ai_settings.json</code> — restrict file access in production.</li>
+                        <li>Keys are never logged or displayed in plain text.</li>
+                        <li>Leave a key field blank to keep the existing value.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /row -->
+</form>
+
+@section Scripts {
+<script>
+// ── Provider section visibility ─────────────────────────────────────────────
+const providerSelect = document.getElementById('providerSelect');
+const sections = document.querySelectorAll('.provider-section');
+
+function showProvider(val) {
+    sections.forEach(s => s.style.display = 'none');
+    const target = document.getElementById('section-' + val);
+    if (target) target.style.display = 'block';
+}
+providerSelect.addEventListener('change', () => showProvider(providerSelect.value));
+showProvider(providerSelect.value);
+
+// ── Toggle password visibility ──────────────────────────────────────────────
+document.querySelectorAll('.toggle-password').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const name = btn.dataset.target;
+        const input = document.querySelector(`[name="${name}"]`);
+        if (!input) return;
+        const isPassword = input.type === 'password';
+        input.type = isPassword ? 'text' : 'password';
+        btn.querySelector('i').className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
+    });
+});
+
+// ── Swagger link ────────────────────────────────────────────────────────────
+const urlInput = document.querySelector('[name="PythonServiceUrl"]');
+const swaggerEl = document.getElementById('swaggerLink');
+function updateSwaggerLink() {
+    const base = (urlInput?.value || 'http://localhost:8000').replace(/\/$/, '');
+    swaggerEl.textContent = base + '/docs';
+}
+urlInput?.addEventListener('input', updateSwaggerLink);
+updateSwaggerLink();
+
+// ── Budget ──────────────────────────────────────────────────────────────────
+(function () {
+    const fromEl     = document.getElementById('budgetFrom');
+    const toEl       = document.getElementById('budgetTo');
+    const provEl     = document.getElementById('budgetProvider');
+    const btnLoad    = document.getElementById('btnLoadBudget');
+    const spinner    = document.getElementById('budgetSpinner');
+    const summary    = document.getElementById('budgetSummary');
+    const breakdown  = document.getElementById('budgetBreakdown');
+    const emptyMsg   = document.getElementById('budgetEmpty');
+    const errMsg     = document.getElementById('budgetError');
+
+    // Default date range: last 30 days
+    const today = new Date();
+    const prior = new Date(); prior.setDate(today.getDate() - 30);
+    toEl.value   = today.toISOString().slice(0, 10);
+    fromEl.value = prior.toISOString().slice(0, 10);
+
+    function fmt(n) { return n == null ? '—' : n.toLocaleString(); }
+    function fmtCost(v) { return v == null ? '—' : '$' + v.toFixed(6); }
+    function fmtTs(ts) {
+        try { return new Date(ts).toLocaleString(); } catch { return ts; }
+    }
+
+    btnLoad.addEventListener('click', async () => {
+        errMsg.style.display = 'none';
+        summary.style.display = 'none';
+        breakdown.style.display = 'none';
+        emptyMsg.style.display = 'none';
+        spinner.style.display = 'inline-block';
+
+        const params = new URLSearchParams();
+        if (fromEl.value) params.set('from', fromEl.value);
+        if (toEl.value)   params.set('to',   toEl.value);
+        if (provEl.value) params.set('provider', provEl.value);
+
+        try {
+            const r = await fetch('@Url.Action("GetBudget", "Settings")?' + params.toString());
+            const d = await r.json();
+            spinner.style.display = 'none';
+
+            if (d.error) {
+                errMsg.textContent = 'Error: ' + d.error;
+                errMsg.style.display = 'block';
+                return;
+            }
+
+            document.getElementById('bTotalCalls').textContent  = fmt(d.total_calls);
+            document.getElementById('bTotalTokens').textContent = fmt(d.total_tokens);
+            document.getElementById('bTotalCost').textContent   = fmtCost(d.total_cost_usd);
+            summary.style.display = '';
+
+            if (!d.total_calls) { emptyMsg.style.display = ''; return; }
+
+            // Provider breakdown table
+            const pb = document.getElementById('budgetProviderBody');
+            pb.innerHTML = '';
+            (d.by_provider || []).forEach(p => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><span class="badge bg-secondary">${p.provider}</span></td>
+                    <td class="font-monospace small">${p.model}</td>
+                    <td class="text-end">${fmt(p.calls)}</td>
+                    <td class="text-end">${fmt(p.prompt_tokens)}</td>
+                    <td class="text-end">${fmt(p.completion_tokens)}</td>
+                    <td class="text-end">${fmt(p.total_tokens)}</td>
+                    <td class="text-end fw-semibold">${fmtCost(p.cost_usd)}</td>`;
+                pb.appendChild(tr);
+            });
+
+            // Detail table
+            const db = document.getElementById('budgetDetailBody');
+            db.innerHTML = '';
+            (d.records || []).forEach(rec => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="small text-muted">${fmtTs(rec.ts)}</td>
+                    <td><span class="badge bg-secondary">${rec.provider}</span></td>
+                    <td class="font-monospace small">${rec.model}</td>
+                    <td class="small">${rec.task}</td>
+                    <td class="text-end">${fmt(rec.prompt_tokens)}</td>
+                    <td class="text-end">${fmt(rec.completion_tokens)}</td>
+                    <td class="text-end">${fmtCost(rec.cost_usd)}</td>
+                    <td class="text-end small text-muted">${rec.latency_ms ? rec.latency_ms.toFixed(0) + ' ms' : '—'}</td>`;
+                db.appendChild(tr);
+            });
+
+            breakdown.style.display = '';
+        } catch (e) {
+            spinner.style.display = 'none';
+            errMsg.textContent = 'Could not reach the Python service: ' + e.message;
+            errMsg.style.display = 'block';
+        }
+    });
+})();
+
+// ── Health check ────────────────────────────────────────────────────────────
+document.getElementById('btnCheckHealth').addEventListener('click', async () => {
+    const result = document.getElementById('healthResult');
+    result.innerHTML = '<span class="spinner-border spinner-border-sm text-primary"></span> Checking...';
+    try {
+        const r = await fetch('@Url.Action("CheckPythonHealth", "Settings")');
+        const data = await r.json();
+        const ok = data.status === 'HEALTHY' || data.status === 'DEGRADED';
+        const colour = data.status === 'HEALTHY' ? 'success' : data.status === 'DEGRADED' ? 'warning' : 'danger';
+        result.innerHTML = `<span class="badge bg-${colour} fs-6">${data.status}</span>`;
+        if (data.providers) {
+            const list = data.providers.map(p =>
+                `<div class="small mt-1"><i class="fas fa-circle text-${p.healthy ? 'success' : 'danger'} me-1" style="font-size:.6rem"></i>${p.name}</div>`
+            ).join('');
+            result.innerHTML += list;
+        }
+    } catch (e) {
+        result.innerHTML = '<span class="badge bg-danger">UNREACHABLE</span>';
+    }
+});
+</script>
+}

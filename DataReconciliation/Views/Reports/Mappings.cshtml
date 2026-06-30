@@ -1,0 +1,1905 @@
+@model DataReconciliation.Domain.Models.FinalMappingConfig
+@{
+    ViewData["Title"] = "Mapping Workbench";
+    var jobId = ViewBag.JobId as string ?? "";
+    var sourceFields = ViewBag.SourceFields as List<string> ?? new List<string>();
+    var valueMappingTemplates = ViewBag.ValueMappingTemplates as List<DataReconciliation.Application.DTOs.ValueMappingTemplateInfoDto> ?? new List<DataReconciliation.Application.DTOs.ValueMappingTemplateInfoDto>();
+    var hasUploadedValueMappingSeed = ViewBag.HasUploadedValueMappingSeed as bool? ?? false;
+    var uploadedValueMappingSeedName = ViewBag.UploadedValueMappingSeedName as string ?? "";
+}
+
+<div class="d-flex align-items-center mb-3">
+    <a asp-controller="Workflow" asp-action="Details" asp-route-jobId="@jobId" class="btn btn-outline-secondary me-3">
+        <i class="fas fa-arrow-left"></i>
+    </a>
+    <div>
+        <h2 class="mb-0"><i class="fas fa-tools me-2 text-secondary"></i>Mapping Workbench</h2>
+        <code class="text-muted small">@jobId</code>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show">
+        <i class="fas fa-check-circle me-2"></i>@TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show">
+        <i class="fas fa-exclamation-triangle me-2"></i>@TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@if (Model == null)
+{
+    <div class="alert alert-warning"><i class="fas fa-exclamation-circle me-2"></i>Mapping consolidation has not run yet.</div>
+}
+else
+{
+    <!-- ─── Tab navigation ─────────────────────────────────── -->
+    <ul class="nav nav-tabs border-bottom-0" id="workbenchTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-structural" data-bs-toggle="tab" data-bs-target="#pane-structural"
+                    type="button" role="tab">
+                <i class="fas fa-link me-1"></i>Structural Mapping
+                <span class="badge bg-secondary ms-1">@Model.Mappings.Count</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-valuemapping" data-bs-toggle="tab" data-bs-target="#pane-valuemapping"
+                    type="button" role="tab">
+                <i class="fas fa-exchange-alt me-1"></i>Value Mapping
+                <span class="badge bg-info ms-1" id="vmCandidateBadge">…</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-transformations" data-bs-toggle="tab" data-bs-target="#pane-transformations"
+                    type="button" role="tab">
+                <i class="fas fa-magic me-1"></i>Transformations
+                <span class="badge bg-secondary ms-1">@Model.Mappings.Count(m => m.Transformations.Any(t => !string.Equals(t.Operation,"HARDCODED_VALUE",StringComparison.OrdinalIgnoreCase)))</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-reconciliation" data-bs-toggle="tab" data-bs-target="#pane-reconciliation"
+                    type="button" role="tab">
+                <i class="fas fa-balance-scale me-1"></i>Reconciliation
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content border border-top-0 rounded-bottom bg-white p-3 mb-3" id="workbenchTabContent">
+
+        <!-- ═══════════════════════════════════════════════════
+             TAB 1 – STRUCTURAL MAPPING
+        ════════════════════════════════════════════════════ -->
+        <div class="tab-pane fade show active" id="pane-structural" role="tabpanel">
+
+            <!-- KPI cards -->
+            <div class="row mb-3 g-2">
+                <div class="col-6 col-md-3">
+                    <div class="card text-center h-100"><div class="card-body py-2">
+                        <div class="fs-3 fw-bold">@Model.Mappings.Count</div>
+                        <div class="small text-muted">Total Fields</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card text-center h-100 border-success"><div class="card-body py-2">
+                        <div class="fs-3 fw-bold text-success">@Model.Mappings.Count(m => m.Status.ToString() != "UNRESOLVED")</div>
+                        <div class="small text-muted">Mapped</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card text-center h-100 border-danger"><div class="card-body py-2">
+                        <div class="fs-3 fw-bold text-danger">@Model.Mappings.Count(m => m.Status.ToString() == "UNRESOLVED")</div>
+                        <div class="small text-muted">Unresolved</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card text-center h-100 border-warning"><div class="card-body py-2">
+                        <div class="fs-3 fw-bold text-warning">@Model.Mappings.Count(m => m.Confidence < 0.70)</div>
+                        <div class="small text-muted">Low Confidence</div>
+                    </div></div>
+                </div>
+            </div>
+
+            <!-- Enhancement 1: Delta File Upload Buttons -->
+            <div class="d-flex gap-2 flex-wrap mb-3 align-items-center">
+                <button type="button" class="btn btn-sm btn-outline-success" id="deltaUploadSourceBtn">
+                    <i class="fas fa-file-upload me-1"></i>Upload Additional Source File
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-info" id="deltaUploadTargetBtn">
+                    <i class="fas fa-file-upload me-1"></i>Upload Updated Target Schema
+                </button>
+                <span id="deltaUploadStatus" class="small text-muted"></span>
+            </div>
+            <input type="file" class="d-none" id="deltaSourceFileInput" accept=".csv,.xlsx,.xls,.json,.txt" />
+            <input type="file" class="d-none" id="deltaTargetFileInput" accept=".csv,.xlsx,.xls" />
+
+            @if (!sourceFields.Any())
+            {
+                <div class="alert alert-info small py-2">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Source schema profile not found — source field dropdowns show only currently mapped values.
+                    Run <strong>Source Schema Profiling</strong> to populate all available source fields.
+                </div>
+            }
+
+            <!-- Template loader + confidence legend -->
+            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <select class="form-select form-select-sm" id="templateSelect" style="min-width: 220px;">
+                        <option value="">Select a template…</option>
+                        @foreach (var template in valueMappingTemplates)
+                        {
+                            <option value="@template.TemplateName">@template.TemplateName</option>
+                        }
+                        @if (hasUploadedValueMappingSeed)
+                        {
+                            <option value="__uploaded_seed__">&#128206; @uploadedValueMappingSeedName (uploaded seed)</option>
+                        }
+                    </select>
+                    <button type="button" class="btn btn-sm btn-outline-info" id="loadTemplateBtn">
+                        <i class="fas fa-folder-open me-1"></i>Load Template
+                    </button>
+                </div>
+                <div class="text-muted small">
+                    <span class="badge bg-success me-1">●</span>≥0.90
+                    <span class="badge bg-warning text-dark me-1 ms-2">●</span>0.70–0.89
+                    <span class="badge bg-danger me-1 ms-2">●</span>&lt;0.70
+                </div>
+            </div>
+
+            <!-- Mapping edit form -->
+            <form asp-controller="Reports" asp-action="SaveMappings" method="post" id="mappingsForm">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="jobId" value="@jobId" />
+                <div class="card">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center py-2 flex-wrap gap-2">
+                        <h6 class="mb-0"><i class="fas fa-table me-1"></i>Mappings</h6>
+                        <div class="d-flex gap-2 flex-wrap align-items-center">
+                            <a class="btn btn-sm btn-outline-secondary"
+                               asp-controller="Reports" asp-action="DownloadStructuralMapping"
+                               asp-route-jobId="@jobId">
+                                <i class="fas fa-file-arrow-down me-1"></i>Download Mapping
+                            </a>
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    data-bs-toggle="collapse" data-bs-target="#uploadMappingPanel">
+                                <i class="fas fa-file-arrow-up me-1"></i>Upload Edited Mapping
+                            </button>
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                <i class="fas fa-save me-1"></i>Save Changes
+                            </button>
+                        </div>
+                    </div>
+                    @* Upload Mapping panel — must NOT be a nested form (breaks outer mappingsForm) *@
+                    <div class="collapse" id="uploadMappingPanel">
+                        <div class="p-3 border-bottom bg-light">
+                            <p class="small text-muted mb-2">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Download the Excel, edit source fields and merge rules offline, then re-upload to save.
+                                Each target field needs one PRIMARY row; add FALLBACK or CONCAT rows for extra sources.
+                            </p>
+                            <div class="row g-2 align-items-end">
+                                <div class="col-auto flex-grow-1">
+                                    <input type="file" id="importMappingFileInput" class="form-control form-control-sm"
+                                           accept=".xlsx,.xls" />
+                                </div>
+                                <div class="col-auto">
+                                    <button type="button" id="importMappingSubmitBtn" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-upload me-1"></i>Import &amp; Save
+                                    </button>
+                                </div>
+                                <div class="col-12">
+                                    <span id="importMappingStatus" class="small"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width:36px">#</th>
+                                    <th>Target Field</th>
+                                    <th title="Source vs Target field length">Length <i class="fas fa-info-circle text-muted" style="font-size:.7rem"></i></th>
+                                    <th>Source Field <small class="text-muted fw-normal">(editable)</small></th>
+                                    <th>Dataset</th>
+                                    <th title="Match origin">Status / Method <i class="fas fa-info-circle text-muted" style="font-size:.7rem"></i></th>
+                                    <th>Confidence</th>
+                                    <th>Value Mapping</th>
+                                    <th style="width:110px">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var (mapping, idx) in Model.Mappings
+                                    .OrderBy(m => m.TargetField, StringComparer.OrdinalIgnoreCase)
+                                    .Select((m, i) => (m, i)))
+                                {
+                                    var isFixedValue = string.Equals(mapping.MatchSource, "Fixed Value", StringComparison.OrdinalIgnoreCase);
+                                    var statusLabel = mapping.Status.ToString() switch
+                                    {
+                                        _ when isFixedValue       => "Fixed Value",
+                                        "AUTO_MATCHED"            => "Deterministic",
+                                        "AI_MATCHED"              => "AI Matched",
+                                        "MANUAL_REVIEW_REQUIRED"  => "Needs Review",
+                                        "CONFIRMED"               => "Confirmed",
+                                        "UNRESOLVED"              => "Unresolved",
+                                        _                         => mapping.Status.ToString()
+                                    };
+                                    var statusClass = mapping.Status.ToString() switch
+                                    {
+                                        _ when isFixedValue       => "bg-dark",
+                                        "AUTO_MATCHED"            => "bg-success",
+                                        "AI_MATCHED"              => "bg-warning text-dark",
+                                        "MANUAL_REVIEW_REQUIRED"  => "bg-orange text-dark",
+                                        "CONFIRMED"               => "bg-success",
+                                        "UNRESOLVED"              => "bg-danger",
+                                        _                         => "bg-secondary"
+                                    };
+                                    var confValue = mapping.Confidence;
+                                    var confClass = confValue >= 0.90 ? "text-success fw-bold"
+                                        : confValue >= 0.70 ? "text-warning fw-bold"
+                                        : "text-danger fw-bold";
+                                    var isUnresolved = mapping.Status.ToString() == "UNRESOLVED";
+
+                                    var sourceFieldLengths = ViewBag.SourceFieldLengths as Dictionary<string, int> ?? new Dictionary<string, int>();
+                                    var targetFieldLengths = ViewBag.TargetFieldLengths as Dictionary<string, int?> ?? new Dictionary<string, int?>();
+                                    var sourceLength = !string.IsNullOrEmpty(mapping.SourceField) && sourceFieldLengths.ContainsKey(mapping.SourceField)
+                                        ? sourceFieldLengths[mapping.SourceField] : (int?)null;
+                                    var targetLength = targetFieldLengths.ContainsKey(mapping.TargetField)
+                                        ? targetFieldLengths[mapping.TargetField] : (int?)null;
+
+                                    string lengthDisplay; string lengthClass;
+                                    if (sourceLength.HasValue && targetLength.HasValue)
+                                    {
+                                        if (sourceLength > targetLength) { lengthDisplay = $"S{sourceLength}>T{targetLength}"; lengthClass = "bg-warning text-dark"; }
+                                        else if (sourceLength < targetLength) { lengthDisplay = $"S{sourceLength}<T{targetLength}"; lengthClass = "bg-info text-white"; }
+                                        else { lengthDisplay = $"={sourceLength}"; lengthClass = "bg-success text-white"; }
+                                    }
+                                    else if (sourceLength.HasValue) { lengthDisplay = $"S:{sourceLength}"; lengthClass = "bg-light text-dark"; }
+                                    else if (targetLength.HasValue) { lengthDisplay = $"T:{targetLength}"; lengthClass = "bg-light text-dark"; }
+                                    else { lengthDisplay = "—"; lengthClass = "text-muted"; }
+
+                                    var (msIcon, msClass, msLabel) = mapping.MatchSource switch
+                                    {
+                                        "Prior Mapping Data"                 => ("fa-history",       "bg-info text-white",      "Historic"),
+                                        "AI Inference"                       => ("fa-robot",         "bg-purple text-white",    "AI"),
+                                        "Fixed Value"                        => ("fa-lock",          "bg-dark text-white",      "Fixed"),
+                                        "Exact Name Match"                   => ("fa-check-circle",  "bg-success text-white",   "Exact"),
+                                        "Normalised Name Match"              => ("fa-equals",        "bg-secondary text-white", "Normalised"),
+                                        "Abbreviation (Built-in Dictionary)" => ("fa-book",          "bg-secondary text-white", "Dictionary"),
+                                        "Partial Name Match"                 => ("fa-adjust",        "bg-secondary text-white", "Partial"),
+                                        "Fuzzy Name Match"                   => ("fa-tilde",         "bg-secondary text-white", "Fuzzy"),
+                                        "AI-enriched Exact Match"            => ("fa-brain",         "bg-warning text-dark",    "AI+Exact"),
+                                        "AI-enriched Name Match"             => ("fa-brain",         "bg-warning text-dark",    "AI+Name"),
+                                        "AI-enriched Abbreviation"           => ("fa-brain",         "bg-warning text-dark",    "AI+Dict"),
+                                        "AI-enriched Match"                  => ("fa-brain",         "bg-warning text-dark",    "AI Match"),
+                                        "Rule-based Match"                   => ("fa-magic",         "bg-secondary text-white", "Rule-based"),
+                                        "Manual Confirmation"                => ("fa-user-check",    "bg-primary text-white",   "Manual"),
+                                        "historical"                         => ("fa-history",       "bg-info text-white",      "Historic"),
+                                        "exact_match"                        => ("fa-check-circle",  "bg-success text-white",   "Exact"),
+                                        "normalized_match"                   => ("fa-equals",        "bg-secondary text-white", "Normalised"),
+                                        "normalized_abbreviation"            => ("fa-book",          "bg-secondary text-white", "Dictionary"),
+                                        "partial_match"                      => ("fa-adjust",        "bg-secondary text-white", "Partial"),
+                                        "fuzzy_match"                        => ("fa-tilde",         "bg-secondary text-white", "Fuzzy"),
+                                        "hardcoded_value"                    => ("fa-lock",          "bg-dark text-white",      "Fixed"),
+                                        "unresolved" or "Unresolved"         => ("fa-exclamation",   "bg-danger text-white",    "Unresolved"),
+                                        var t when t != null && t.StartsWith("semantic_") => ("fa-brain", "bg-warning text-dark", "AI Match"),
+                                        _ => ("fa-question", "bg-light text-dark", string.IsNullOrWhiteSpace(mapping.MatchSource) ? "Unknown" : mapping.MatchSource)
+                                    };
+
+                                    var valueMappingRule = mapping.Transformations.FirstOrDefault(t => string.Equals(t.Operation, "VALUE_MAPPING", StringComparison.OrdinalIgnoreCase));
+                                    var valueMappingCount = valueMappingRule?.Rules?.Count ?? 0;
+                                    var serializedRules = valueMappingRule?.Rules == null ? "{}" : System.Text.Json.JsonSerializer.Serialize(valueMappingRule.Rules);
+
+                                    <tr class="mapping-row" data-target-field="@mapping.TargetField">
+                                        <td class="text-center text-muted">@(idx+1)</td>
+                                        <td>
+                                            <code class="small">@mapping.TargetField</code>
+                                            <input type="hidden" name="Updates[@idx].TargetField" value="@mapping.TargetField" />
+                                        </td>
+                                        <td>
+                                            @if (lengthDisplay != "—")
+                                            {
+                                                <span class="badge @lengthClass" style="font-size:.7rem">@lengthDisplay</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">—</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @* Primary source field *@
+                                            <div class="d-flex align-items-center gap-1 mb-1">
+                                                <span class="badge bg-primary" style="font-size:.65rem;white-space:nowrap">PRIMARY</span>
+                                                <select name="Updates[@idx].SourceField"
+                                                        class="form-select form-select-sm @(isUnresolved ? "border-danger" : "")">
+                                                    <option value="">-- Unresolved --</option>
+                                                    @foreach (var sf in sourceFields)
+                                                    {
+                                                        <option value="@sf" selected="@(sf == mapping.SourceField ? "selected" : null)">@sf</option>
+                                                    }
+                                                    @if (!string.IsNullOrEmpty(mapping.SourceField) && !sourceFields.Contains(mapping.SourceField))
+                                                    {
+                                                        <option value="@mapping.SourceField" selected>@mapping.SourceField</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                            @* Additional source fields *@
+                                            <div class="additional-sources-container" data-idx="@idx">
+                                                @for (int ai = 0; ai < mapping.AdditionalSources.Count; ai++)
+                                                {
+                                                    var addSrc = mapping.AdditionalSources[ai];
+                                                    var addRuleColors = new Dictionary<string,string>{["FALLBACK"]="bg-secondary",["CONCAT"]="bg-info"};
+                                                    var addRuleColor = addRuleColors.GetValueOrDefault(addSrc.MergeRule, "bg-secondary");
+                                                    <div class="d-flex align-items-center gap-1 mb-1 additional-source-row">
+                                                        <select name="Updates[@idx].AdditionalSources[@ai].MergeRule"
+                                                                class="form-select form-select-sm add-rule-sel" style="width:90px;min-width:90px">
+                                                            <option value="FALLBACK" selected="@(addSrc.MergeRule=="FALLBACK"?"selected":null)">FALLBACK</option>
+                                                            <option value="CONCAT"   selected="@(addSrc.MergeRule=="CONCAT"?"selected":null)">CONCAT</option>
+                                                        </select>
+                                                        <select name="Updates[@idx].AdditionalSources[@ai].SourceField"
+                                                                class="form-select form-select-sm add-field-sel">
+                                                            <option value="">-- Select --</option>
+                                                            @foreach (var sf in sourceFields)
+                                                            {
+                                                                <option value="@sf" selected="@(sf == addSrc.SourceField ? "selected" : null)">@sf</option>
+                                                            }
+                                                            @if (!string.IsNullOrEmpty(addSrc.SourceField) && !sourceFields.Contains(addSrc.SourceField))
+                                                            {
+                                                                <option value="@addSrc.SourceField" selected>@addSrc.SourceField</option>
+                                                            }
+                                                        </select>
+                                                        <button type="button" class="btn btn-sm btn-outline-danger remove-add-src" title="Remove">
+                                                            <i class="fas fa-times"></i>
+                                                        </button>
+                                                    </div>
+                                                }
+                                            </div>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary add-source-btn"
+                                                    data-idx="@idx" style="font-size:.7rem">
+                                                <i class="fas fa-plus me-1"></i>Add Source
+                                            </button>
+                                        </td>
+                                        <td class="text-muted small">@(mapping.SourceDataset ?? "—")</td>
+                                        <td>
+                                            <span class="badge @statusClass me-1">@statusLabel</span>
+                                            <span class="badge @msClass" title="@mapping.MatchSource"><i class="fas @msIcon me-1"></i>@msLabel</span>
+                                        </td>
+                                        <td class="@confClass small">@mapping.Confidence.ToString("F2")</td>
+                                        <td>
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-info value-mapping-btn"
+                                                    data-target-field="@mapping.TargetField"
+                                                    data-source-field="@mapping.SourceField"
+                                                    data-rules='@System.Net.WebUtility.HtmlEncode(serializedRules)'
+                                                    data-template-name="@mapping.TargetField">
+                                                <i class="fas fa-list-check me-1"></i>@(valueMappingCount > 0 ? $"{valueMappingCount} rules" : "Manage")
+                                            </button>
+                                        </td>
+                                        <td>
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-warning re-ai-btn mb-1"
+                                                    data-target-field="@mapping.TargetField"
+                                                    title="Re-run AI matching for this field">
+                                                <i class="fas fa-robot"></i>
+                                            </button>
+                                            <div class="form-check d-inline-flex align-items-center gap-1 ms-1">
+                                                <input class="form-check-input mapping-delete-checkbox"
+                                                       type="checkbox"
+                                                       id="del_@idx"
+                                                       name="Updates[@idx].Delete"
+                                                       value="true"
+                                                       data-row-index="@idx" />
+                                                <label class="form-check-label small text-danger" for="del_@idx">Del</label>
+                                            </div>
+                                            <input type="hidden" name="Updates[@idx].Delete" value="false" />
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="card-footer bg-white d-flex justify-content-between align-items-center py-2">
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="fas fa-save me-1"></i>Save Mapping Changes
+                        </button>
+                        <span class="text-muted small">After saving, use <strong>Generate Output File</strong> below.</span>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════
+             TAB 2 – VALUE MAPPING
+        ════════════════════════════════════════════════════ -->
+        <div class="tab-pane fade" id="pane-valuemapping" role="tabpanel">
+
+            <div class="row mb-3 g-2">
+                <div class="col-6 col-md-3">
+                    <div class="card text-center h-100"><div class="card-body py-2">
+                        <div class="fs-3 fw-bold" id="vmKpiTotal">—</div>
+                        <div class="small text-muted">Candidates</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card text-center h-100 border-success"><div class="card-body py-2">
+                        <div class="fs-3 fw-bold text-success" id="vmKpiComplete">—</div>
+                        <div class="small text-muted">Complete</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card text-center h-100 border-warning"><div class="card-body py-2">
+                        <div class="fs-3 fw-bold text-warning" id="vmKpiPartial">—</div>
+                        <div class="small text-muted">Partial</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card text-center h-100 border-secondary"><div class="card-body py-2">
+                        <div class="fs-3 fw-bold text-secondary" id="vmKpiPending">—</div>
+                        <div class="small text-muted">Pending</div>
+                    </div></div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 flex-wrap mb-3 align-items-center">
+                <!-- Enhancement 1: Delta upload buttons in Value Mapping tab -->
+                <button type="button" class="btn btn-sm btn-outline-success delta-upload-src-vm">
+                    <i class="fas fa-file-upload me-1"></i>Upload Additional Source File
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-info delta-upload-tgt-vm">
+                    <i class="fas fa-file-upload me-1"></i>Upload Updated Target Schema
+                </button>
+                <span class="border-start ms-2 ps-2"></span>
+                <form asp-controller="Reports" asp-action="DiscoverValueMappings" method="post" class="d-inline">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="jobId" value="@jobId" />
+                    <button type="submit" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-search me-1"></i>Discover Candidates
+                    </button>
+                </form>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="refreshVmBtn">
+                    <i class="fas fa-sync me-1"></i>Refresh
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-info" id="genVmTemplateBtn">
+                    <i class="fas fa-robot me-1"></i>Generate AI Value Mapping Template
+                </button>
+                <span id="vmAiStatus" class="small text-muted"></span>
+            </div>
+
+            <div class="card">
+                <div class="card-header bg-white py-2">
+                    <h6 class="mb-0"><i class="fas fa-exchange-alt me-1"></i>Value Mapping Candidates</h6>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Source Field</th>
+                                <th>Target Field</th>
+                                <th>Distinct Values</th>
+                                <th>Rules</th>
+                                <th>Coverage</th>
+                                <th>Status</th>
+                                <th>Reason</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vmCandidatesTbody">
+                            <tr><td colspan="8" class="text-center text-muted py-4">
+                                <i class="fas fa-spinner fa-spin me-2"></i>Loading candidates…
+                            </td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════
+             TAB 3 – TRANSFORMATIONS
+        ════════════════════════════════════════════════════ -->
+        <div class="tab-pane fade" id="pane-transformations" role="tabpanel">
+
+            @{
+                var allTransformRows = Model.Mappings
+                    .SelectMany(m => m.Transformations
+                        .Where(t => !string.Equals(t.Operation, "HARDCODED_VALUE", StringComparison.OrdinalIgnoreCase))
+                        .Select(t => new { Mapping = m, Rule = t }))
+                    .ToList();
+                var aiSuggestedCount = allTransformRows.Count(r => r.Rule.AIParameters != null && r.Rule.AIParameters.Any());
+            }
+
+            <div class="row mb-3 g-2">
+                <div class="col-6 col-md-4">
+                    <div class="card text-center h-100"><div class="card-body py-2">
+                        <div class="fs-3 fw-bold">@allTransformRows.Count</div>
+                        <div class="small text-muted">Transformation Rules</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-md-4">
+                    <div class="card text-center h-100 border-warning"><div class="card-body py-2">
+                        <div class="fs-3 fw-bold text-warning">@aiSuggestedCount</div>
+                        <div class="small text-muted"><i class="fas fa-robot me-1"></i>AI Suggested</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-md-4">
+                    <div class="card text-center h-100 border-info"><div class="card-body py-2">
+                        <div class="fs-3 fw-bold text-info">@(allTransformRows.Count - aiSuggestedCount)</div>
+                        <div class="small text-muted">Rule-based</div>
+                    </div></div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mb-3 align-items-center flex-wrap">
+                <span class="text-muted small">Preview output sample:</span>
+                <button type="button" class="btn btn-sm btn-outline-secondary preview-btn" data-count="10">10 rows</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary preview-btn" data-count="20">20 rows</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary preview-btn" data-count="50">50 rows</button>
+                <span id="previewStatus" class="small text-muted"></span>
+            </div>
+
+            <div class="card">
+                <div class="card-header bg-white py-2">
+                    <h6 class="mb-0"><i class="fas fa-magic me-1"></i>All Transformation Rules</h6>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Target Field</th>
+                                <th>Source Field</th>
+                                <th>Transformation Rule</th>
+                                <th>Actual Field Change</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @{int txIdx = 0;}
+                            @foreach (var m in Model.Mappings)
+                            {
+                                var visibleTx = m.Transformations
+                                    .Where(t => !string.Equals(t.Operation, "HARDCODED_VALUE", StringComparison.OrdinalIgnoreCase))
+                                    .ToList();
+                                if (!visibleTx.Any()) continue;
+                                foreach (var rule in visibleTx)
+                                {
+                                    txIdx++;
+                                    var operation = (rule.Operation ?? "").ToUpperInvariant();
+                                    var changeDescription = operation switch
+                                    {
+                                        "FIXED_WIDTH_FORMATTING"   => $"Pad/truncate to {rule.FixedWidth?.ToString() ?? "target width"} chars, {(rule.Alignment ?? "LEFT").ToUpperInvariant()} aligned, fill '{(string.IsNullOrEmpty(rule.PadCharacter) ? " " : rule.PadCharacter)}'",
+                                        "DATE_FORMATTING"          => $"Convert date → {(string.IsNullOrWhiteSpace(rule.Format) ? "target date format" : rule.Format)}",
+                                        "DECIMAL_FORMATTING"       => "Normalize decimal representation for target output",
+                                        "VALUE_MAPPING"            => $"Map source values using {(rule.Rules?.Count ?? 0)} rule(s)",
+                                        "MASKING"                  => string.IsNullOrWhiteSpace(rule.MaskPattern) ? "Mask sensitive value" : $"Mask value → {rule.MaskPattern}",
+                                        "DEFAULT_VALUE_ASSIGNMENT" => string.IsNullOrWhiteSpace(rule.DefaultValue) ? "Assign default when empty" : $"Default: '{rule.DefaultValue}'",
+                                        "DATATYPE_CONVERSION"      => "Convert value to target datatype",
+                                        "UPPERCASE"                => "Convert text → UPPERCASE",
+                                        "LOWERCASE"                => "Convert text → lowercase",
+                                        "TRIM"                     => "Trim leading/trailing spaces",
+                                        _ => rule.AIParameters != null && rule.AIParameters.Any()
+                                            ? "Apply AI-derived transformation"
+                                            : "Apply configured rule"
+                                    };
+                                    <tr>
+                                        <td class="text-muted small">@txIdx</td>
+                                        <td><code class="small">@m.TargetField</code></td>
+                                        <td class="text-muted small">@(m.SourceField ?? "—")</td>
+                                        <td>
+                                            <span class="badge bg-light text-dark border">@rule.Operation</span>
+                                            @if (rule.AIParameters != null && rule.AIParameters.Any())
+                                            {
+                                                <span class="badge bg-warning text-dark ms-1"><i class="fas fa-robot me-1"></i>AI</span>
+                                            }
+                                        </td>
+                                        <td class="small text-muted">@changeDescription</td>
+                                    </tr>
+                                }
+                            }
+                            @if (txIdx == 0)
+                            {
+                                <tr><td colspan="5" class="text-center text-muted py-3">No transformations configured.</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Enhancement 3: Transformation Override Grid -->
+            <div class="card mt-3">
+                <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="fas fa-edit me-1"></i>Transformation Overrides</h6>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <span id="overridesSaveStatus" class="small"></span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="loadOverridesBtn">
+                            <i class="fas fa-sync me-1"></i>Load
+                        </button>
+                        <button type="button" class="btn btn-sm btn-primary" id="saveOverridesBtn">
+                            <i class="fas fa-save me-1"></i>Save Overrides
+                        </button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Target Field</th>
+                                <th>Source Field</th>
+                                <th>Suggested Transformation</th>
+                                <th>Confidence</th>
+                                <th>Override Transformation</th>
+                                <th>Custom Expression</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="overridesTbody">
+                            <tr><td colspan="7" class="text-center text-muted py-3">Click <strong>Load</strong> to view transformation overrides.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════
+             TAB 4 – RECONCILIATION (Enhancement 2)
+        ════════════════════════════════════════════════════ -->
+        <div class="tab-pane fade" id="pane-reconciliation" role="tabpanel">
+
+            <!-- Recon Dashboard KPIs -->
+            <div class="row mb-3 g-2">
+                <div class="col-6 col-md-3">
+                    <div class="card text-center h-100"><div class="card-body py-2">
+                        <div class="fs-3 fw-bold" id="reconFieldsSelected">—</div>
+                        <div class="small text-muted">Fields Selected</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card text-center h-100 border-info"><div class="card-body py-2">
+                        <div class="fs-3 fw-bold text-info" id="reconCoverage">—</div>
+                        <div class="small text-muted">Coverage %</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card text-center h-100 border-success"><div class="card-body py-2">
+                        <div class="fs-3 fw-bold text-success" id="reconMatched">—</div>
+                        <div class="small text-muted">Matched Records</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card text-center h-100 border-danger"><div class="card-body py-2">
+                        <div class="fs-3 fw-bold text-danger" id="reconFailed">—</div>
+                        <div class="small text-muted">Failed Records</div>
+                    </div></div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 flex-wrap mb-3 align-items-center">
+                <button type="button" class="btn btn-sm btn-outline-primary" id="suggestReconFieldsBtn">
+                    <i class="fas fa-lightbulb me-1"></i>Suggest Reconciliation Fields
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="refreshReconBtn">
+                    <i class="fas fa-sync me-1"></i>Refresh
+                </button>
+                <button type="button" class="btn btn-sm btn-success" id="saveReconConfigBtn">
+                    <i class="fas fa-save me-1"></i>Save Configuration
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-info" id="downloadReconJsonBtn">
+                    <i class="fas fa-download me-1"></i>Download reconciliation_config.json
+                </button>
+                <span id="reconStatus" class="small text-muted"></span>
+            </div>
+
+            <div class="card">
+                <div class="card-header bg-white py-2">
+                    <h6 class="mb-0"><i class="fas fa-balance-scale me-1"></i>Reconciliation Fields</h6>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:40px">#</th>
+                                <th>Field Name</th>
+                                <th>Validation Type</th>
+                                <th>Priority</th>
+                                <th>Mandatory</th>
+                                <th>Reason</th>
+                                <th>Confidence</th>
+                                <th style="width:80px">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reconFieldsTbody">
+                            <tr><td colspan="8" class="text-center text-muted py-4">
+                                Click <strong>Suggest Reconciliation Fields</strong> to begin.
+                            </td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer bg-white py-2">
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="addReconFieldBtn">
+                        <i class="fas fa-plus me-1"></i>Add Field
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /tab-content -->
+
+    <!-- ─── Generate Output File ──────────────────────────── -->
+    <div class="card border-success mb-3">
+        <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h6 class="mb-1 text-success"><i class="fas fa-file-export me-1"></i>Generate Output File</h6>
+                <p class="mb-0 small text-muted">
+                    Once you are happy with the mappings, click to run steps 11–14:
+                    Transformation → Target File Generation → Reconciliation → Reporting.
+                    The <code>target_output.dat</code> will be available on the Workflow Details page.
+                </p>
+            </div>
+            <form asp-controller="Reports" asp-action="GenerateFile" method="post" class="ms-3 flex-shrink-0">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="jobId" value="@jobId" />
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-cogs me-1"></i>Generate Output File
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         MODAL 1 – Value Mapping Editor
+    ═══════════════════════════════════════════════════════ -->
+    <div class="modal fade" id="valueMappingModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title mb-0">Value Mapping Editor</h5>
+                        <small class="text-muted" id="valueMappingSubtitle"></small>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="post" id="valueMappingForm">
+                    @Html.AntiForgeryToken()
+                    <div class="modal-body">
+                        <input type="hidden" name="jobId" value="@jobId" />
+                        <input type="hidden" name="TargetField" id="valueMappingTargetField" />
+                        <input type="hidden" name="SourceField" id="valueMappingSourceField" />
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Template name</label>
+                                <input type="text" class="form-control" name="TemplateName" id="valueMappingTemplateName" placeholder="e.g. Default_Status_Code_Template" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Load template</label>
+                                <select class="form-select" id="modalTemplateSelect">
+                                    <option value="">-- Select existing template --</option>
+                                    @foreach (var template in valueMappingTemplates)
+                                    {
+                                        <option value="@template.TemplateName">@template.TemplateName</option>
+                                    }
+                                    @if (hasUploadedValueMappingSeed)
+                                    {
+                                        <option value="__uploaded_seed__">&#128206; @uploadedValueMappingSeedName (uploaded seed)</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-8">
+                                <label class="form-label">Import rules from Excel (.xlsx/.xls)</label>
+                                <input type="file" class="form-control" id="valueMappingExcelFile" accept=".xlsx,.xls" />
+                                <div class="form-text">Expected columns: Code description, Ext Code, Short description, Long description.</div>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end gap-2">
+                                <button type="button" class="btn btn-outline-success w-100" id="importExcelMappingBtn">
+                                    <i class="fas fa-file-import me-1"></i>Import From Excel
+                                </button>
+                                <button type="button" class="btn btn-outline-primary w-100" id="importUploadedExcelMappingBtn" @(hasUploadedValueMappingSeed ? "" : "disabled")>
+                                    <i class="fas fa-database me-1"></i>Import Uploaded Excel
+                                </button>
+                            </div>
+                            <div class="col-12">
+                                <div class="small text-muted" id="excelImportStatus"></div>
+                                @if (hasUploadedValueMappingSeed)
+                                {
+                                    <div class="small text-muted mt-1">Uploaded at ingestion: <code>@uploadedValueMappingSeedName</code></div>
+                                }
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <h6 class="mb-0">Mappings</h6>
+                                <small class="text-muted">Disable a row to exclude it from the saved mapping set.</small>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="loadModalTemplateBtn">
+                                    <i class="fas fa-folder-open me-1"></i>Load Selected Template
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="addValueMappingRowBtn">
+                                    <i class="fas fa-plus me-1"></i>Add Row
+                                </button>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle" id="valueMappingTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width:22%">Source Value</th>
+                                        <th style="width:22%">Target Value</th>
+                                        <th style="width:8%">Enabled</th>
+                                        <th>Notes</th>
+                                        <th style="width:6%"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="valueMappingTbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer d-flex justify-content-between">
+                        <div class="text-muted small" id="valueMappingCountLabel">0 active rules</div>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-outline-secondary" formaction="@Url.Action("SaveValueMappingTemplate", "Reports")">
+                                <i class="fas fa-floppy-disk me-1"></i>Save Template
+                            </button>
+                            <button type="submit" class="btn btn-primary" formaction="@Url.Action("SaveValueMappings", "Reports")">
+                                <i class="fas fa-save me-1"></i>Save Value Mappings
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         MODAL 2 – Value Mapping Candidate Review
+    ═══════════════════════════════════════════════════════ -->
+    <div class="modal fade" id="vmReviewModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title mb-0"><i class="fas fa-exchange-alt me-2"></i>Review Value Mapping</h5>
+                        <small class="text-muted" id="vmReviewSubtitle"></small>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info small py-2 mb-3" id="vmReviewDistinctBadges"></div>
+                    @if (valueMappingTemplates.Any() || hasUploadedValueMappingSeed)
+                    {
+                        <div class="d-flex align-items-center gap-2 mb-3 border-bottom pb-3 flex-wrap">
+                            <span class="text-muted small text-nowrap">Load template:</span>
+                            <select class="form-select form-select-sm" id="vmReviewTemplateSelect" style="max-width:280px">
+                                <option value="">-- Select template --</option>
+                                @foreach (var t in valueMappingTemplates)
+                                {
+                                    <option value="@t.TemplateName">@t.TemplateName</option>
+                                }
+                                @if (hasUploadedValueMappingSeed)
+                                {
+                                    <option value="__uploaded_seed__">&#128206; @uploadedValueMappingSeedName (uploaded seed)</option>
+                                }
+                            </select>
+                            <button type="button" class="btn btn-sm btn-outline-info" id="vmReviewLoadTemplateBtn">
+                                <i class="fas fa-folder-open me-1"></i>Load
+                            </button>
+                            <span class="text-muted small" id="vmReviewTemplateStatus"></span>
+                        </div>
+                    }
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Source Value</th>
+                                    <th>→ Target Value</th>
+                                    <th style="width:8%">Conf.</th>
+                                    <th style="width:6%">AI?</th>
+                                    <th style="width:6%"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="vmReviewTbody"></tbody>
+                        </table>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="vmReviewAddRowBtn">
+                        <i class="fas fa-plus me-1"></i>Add Row
+                    </button>
+                </div>
+                <div class="modal-footer d-flex justify-content-between">
+                    <div class="text-muted small">Saved to <code>value_mapping_candidates.json</code></div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="vmReviewSaveBtn">
+                            <i class="fas fa-save me-1"></i>Save Mappings
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         MODAL 3 – Transformation Preview
+    ═══════════════════════════════════════════════════════ -->
+    <div class="modal fade" id="txPreviewModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-eye me-2"></i>Transformation Preview</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="txPreviewContent">
+                        <div class="text-center py-4"><i class="fas fa-spinner fa-spin me-2"></i>Loading preview…</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+    (() => {
+        const JOB_ID = '@jobId';
+
+        function escHtml(v) {
+            return (v ?? '').toString()
+                .replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')
+                .replaceAll('"','&quot;').replaceAll("'",'&#39;');
+        }
+
+        function getCsrfToken() {
+            return document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+        }
+
+        // ── Multi-source: Add Source button ────────────────
+        const SOURCE_FIELD_OPTIONS = (() => {
+            // Collect all source field option HTML from first primary select in the table
+            const firstSel = document.querySelector('select[name^="Updates["][name$="].SourceField"]');
+            if (!firstSel) return '<option value="">-- Select --</option>';
+            return [...firstSel.options].map(o =>
+                `<option value="${escHtml(o.value)}">${escHtml(o.text)}</option>`).join('');
+        })();
+
+        function reindexAdditionalSources(container, rowIdx) {
+            container.querySelectorAll('.additional-source-row').forEach((row, ai) => {
+                const ruleSel  = row.querySelector('.add-rule-sel');
+                const fieldSel = row.querySelector('.add-field-sel');
+                if (ruleSel)  ruleSel.name  = `Updates[${rowIdx}].AdditionalSources[${ai}].MergeRule`;
+                if (fieldSel) fieldSel.name = `Updates[${rowIdx}].AdditionalSources[${ai}].SourceField`;
+            });
+        }
+
+        document.addEventListener('click', (e) => {
+            // Add Source
+            const addBtn = e.target.closest('.add-source-btn');
+            if (addBtn) {
+                const rowIdx = addBtn.dataset.idx;
+                const container = document.querySelector(`.additional-sources-container[data-idx="${rowIdx}"]`);
+                if (!container) return;
+                const ai = container.querySelectorAll('.additional-source-row').length;
+                const div = document.createElement('div');
+                div.className = 'additional-source-row d-flex align-items-center gap-1 mb-1';
+                div.innerHTML = `
+                    <select name="Updates[${rowIdx}].AdditionalSources[${ai}].MergeRule"
+                            class="form-select form-select-sm add-rule-sel" style="width:90px;min-width:90px">
+                        <option value="FALLBACK">FALLBACK</option>
+                        <option value="CONCAT">CONCAT</option>
+                    </select>
+                    <select name="Updates[${rowIdx}].AdditionalSources[${ai}].SourceField"
+                            class="form-select form-select-sm add-field-sel">
+                        ${SOURCE_FIELD_OPTIONS}
+                    </select>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-add-src" title="Remove">
+                        <i class="fas fa-times"></i>
+                    </button>`;
+                container.appendChild(div);
+                return;
+            }
+
+            // Remove additional source row
+            const rmBtn = e.target.closest('.remove-add-src');
+            if (rmBtn) {
+                const row = rmBtn.closest('.additional-source-row');
+                const container = row?.closest('.additional-sources-container');
+                row?.remove();
+                if (container) {
+                    const rowIdx = container.dataset.idx;
+                    reindexAdditionalSources(container, rowIdx);
+                }
+            }
+        });
+
+        // Re-index all additional sources before form submit so names are sequential
+        document.getElementById('mappingsForm')?.addEventListener('submit', (event) => {
+            document.querySelectorAll('.additional-sources-container').forEach(container => {
+                reindexAdditionalSources(container, container.dataset.idx);
+            });
+
+            const cnt = document.querySelectorAll('.mapping-delete-checkbox:checked').length;
+            if (cnt > 0 && !window.confirm(`Delete ${cnt} mapping(s)? This will also remove saved value-mapping rules for those target fields.`))
+                event.preventDefault();
+        }, true); // capture phase so reindex runs before the existing submit handler below
+
+        // ── Delete row visual state ─────────────────────────
+        function updateDeleteRowState(checkbox) {
+            const row = checkbox.closest('tr');
+            if (!row) return;
+            const marked = checkbox.checked;
+            row.classList.toggle('table-danger', marked);
+            row.style.opacity = marked ? '0.7' : '1';
+            const sel = row.querySelector('select[name$=".SourceField"]');
+            if (sel) sel.disabled = marked;
+            const vmBtn = row.querySelector('.value-mapping-btn');
+            if (vmBtn) { vmBtn.disabled = marked; vmBtn.classList.toggle('disabled', marked); }
+        }
+
+        document.querySelectorAll('.mapping-delete-checkbox').forEach(cb => {
+            updateDeleteRowState(cb);
+            cb.addEventListener('change', () => updateDeleteRowState(cb));
+        });
+
+        document.getElementById('mappingsForm')?.addEventListener('submit', (event) => {
+            const cnt = document.querySelectorAll('.mapping-delete-checkbox:checked').length;
+            if (cnt > 0 && !window.confirm(`Delete ${cnt} mapping(s)? This will also remove saved value-mapping rules for those target fields.`))
+                event.preventDefault();
+        });
+
+        // ── Value Mapping Editor (Modal 1) ──────────────────
+        const vmEditorEl = document.getElementById('valueMappingModal');
+        const vmEditorModal = (vmEditorEl && typeof bootstrap !== 'undefined') ? new bootstrap.Modal(vmEditorEl) : null;
+
+        if (vmEditorModal) {
+            const tbody     = document.getElementById('valueMappingTbody');
+            const subtitle  = document.getElementById('valueMappingSubtitle');
+            const tfInput   = document.getElementById('valueMappingTargetField');
+            const sfInput   = document.getElementById('valueMappingSourceField');
+            const tnInput   = document.getElementById('valueMappingTemplateName');
+            const modalSel  = document.getElementById('modalTemplateSelect');
+            const pageSel   = document.getElementById('templateSelect');
+            const countLbl  = document.getElementById('valueMappingCountLabel');
+            const excelInput = document.getElementById('valueMappingExcelFile');
+            const excelImportBtn = document.getElementById('importExcelMappingBtn');
+            const uploadedExcelImportBtn = document.getElementById('importUploadedExcelMappingBtn');
+            const excelImportStatus = document.getElementById('excelImportStatus');
+
+            const esc = (v) => (v ?? '').toString()
+                .replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')
+                .replaceAll('"','&quot;').replaceAll("'",'&#39;');
+
+            const buildRow = (entry = {}) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><input type="text" class="form-control form-control-sm entry-source" value="${esc(entry.sourceValue)}" /></td>
+                    <td><input type="text" class="form-control form-control-sm entry-target" value="${esc(entry.targetValue)}" /></td>
+                    <td class="text-center"><input type="checkbox" class="form-check-input entry-enabled" ${entry.isEnabled === false ? '' : 'checked'} /></td>
+                    <td><input type="text" class="form-control form-control-sm entry-notes" value="${esc(entry.notes)}" /></td>
+                    <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-row-btn"><i class="fas fa-trash"></i></button></td>`;
+                row.querySelector('.remove-row-btn').addEventListener('click', () => { row.remove(); updateCount(); });
+                return row;
+            };
+
+            const updateCount = () => {
+                const active = [...tbody.querySelectorAll('tr')].filter(r => r.querySelector('.entry-enabled')?.checked).length;
+                countLbl.textContent = `${active} active rules`;
+            };
+
+            const loadRows = (rulesMap) => {
+                tbody.innerHTML = '';
+                const entries = Object.entries(rulesMap ?? {});
+                if (!entries.length) tbody.appendChild(buildRow());
+                else entries.forEach(([sv, tv]) => tbody.appendChild(buildRow({ sourceValue: sv, targetValue: tv, isEnabled: true })));
+                updateCount();
+            };
+
+            const parseRules = (raw) => { try { return JSON.parse(raw || '{}'); } catch { return {}; } };
+
+            const openMappingButton = (button) => {
+                const tf = button.dataset.targetField || '';
+                const sf = button.dataset.sourceField || '';
+                tfInput.value = tf; sfInput.value = sf;
+                tnInput.value = button.dataset.templateName || tf;
+                subtitle.textContent = `${tf}${sf ? ` · Source: ${sf}` : ''}`;
+                loadRows(parseRules(button.dataset.rules));
+                vmEditorModal.show();
+            };
+
+            document.addEventListener('click', (e) => {
+                const btn = e.target.closest('.value-mapping-btn');
+                if (btn) openMappingButton(btn);
+            });
+
+            document.getElementById('addValueMappingRowBtn')?.addEventListener('click', () => { tbody.appendChild(buildRow()); updateCount(); });
+
+            document.getElementById('loadModalTemplateBtn')?.addEventListener('click', async () => {
+                const tn = modalSel.value;
+                if (!tn) return;
+                // Special case: uploaded seed file — delegate to Import Uploaded Excel
+                if (tn === '__uploaded_seed__') {
+                    uploadedExcelImportBtn?.click();
+                    return;
+                }
+                const res = await fetch(`@Url.Action("LoadValueMappingTemplate","Reports")?jobId=${JOB_ID}&templateName=${encodeURIComponent(tn)}`);
+                if (!res.ok) { if (excelImportStatus) excelImportStatus.textContent = 'Template could not be loaded.'; return; }
+                const payload = await res.json();
+                const af = tfInput.value;
+                const tf = payload.fields?.find(f => f.targetField?.toLowerCase() === af.toLowerCase()) ?? payload.fields?.[0];
+                if (!tf) return;
+                tnInput.value = tn;
+                sfInput.value = tf.sourceField ?? sfInput.value;
+                const rules = {};
+                (tf.entries ?? []).forEach(e => { if (e.isEnabled !== false && e.sourceValue) rules[e.sourceValue] = e.targetValue ?? ''; });
+                loadRows(rules);
+            });
+
+            document.getElementById('loadTemplateBtn')?.addEventListener('click', () => {
+                const tn = pageSel.value;
+                if (!tn) return;
+                // Special case: uploaded seed file — prompt user to open a value mapping row first
+                if (tn === '__uploaded_seed__') {
+                    if (excelImportStatus) excelImportStatus.textContent = 'Open a value mapping row, then select the seed from the modal template dropdown and click "Load Selected Template".';
+                    return;
+                }
+                const btn = [...document.querySelectorAll('.value-mapping-btn')]
+                    .find(b => (b.dataset.templateName || '').toLowerCase() === tn.toLowerCase());
+                if (btn) { openMappingButton(btn); if (modalSel) modalSel.value = tn; }
+                else { if (modalSel) modalSel.value = tn; if (excelImportStatus) excelImportStatus.textContent = 'Template selected. Open a row and click Load Selected Template to apply it.'; }
+            });
+
+            excelImportBtn?.addEventListener('click', async () => {
+                const file = excelInput?.files?.[0];
+                const activeTargetField = tfInput.value?.trim();
+
+                if (!activeTargetField) {
+                    alert('Open a mapping row first so target field context is available.');
+                    return;
+                }
+
+                if (!file) {
+                    alert('Select an Excel file to import.');
+                    return;
+                }
+
+                excelImportBtn.disabled = true;
+                if (excelImportStatus) excelImportStatus.textContent = 'Importing Excel rules…';
+
+                try {
+                    const formData = new FormData();
+                    formData.append('jobId', JOB_ID);
+                    formData.append('targetField', activeTargetField);
+                    formData.append('sourceField', sfInput.value ?? '');
+                    formData.append('excelFile', file);
+
+                    const res = await fetch('@Url.Action("ImportValueMappingsFromExcel", "Reports")', {
+                        method: 'POST',
+                        headers: { 'RequestVerificationToken': getCsrfToken() },
+                        body: formData
+                    });
+
+                    const payload = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                        const available = (payload.availableCodeDescriptions ?? []).slice(0, 10).join(', ');
+                        const suffix = available ? `\nAvailable: ${available}` : '';
+                        throw new Error((payload.error ?? `HTTP ${res.status}`) + suffix);
+                    }
+
+                    const rules = {};
+                    (payload.entries ?? []).forEach(entry => {
+                        if (entry.sourceValue) rules[entry.sourceValue] = entry.targetValue ?? '';
+                    });
+
+                    loadRows(rules);
+                    if (payload.sourceField && !sfInput.value) sfInput.value = payload.sourceField;
+                    if (excelImportStatus) excelImportStatus.textContent = `Imported ${payload.importedCount ?? Object.keys(rules).length} rule(s) from Excel.`;
+                } catch (err) {
+                    if (excelImportStatus) excelImportStatus.textContent = `Import failed: ${err.message}`;
+                    alert(`Excel import failed. ${err.message}`);
+                } finally {
+                    excelImportBtn.disabled = false;
+                }
+            });
+
+            uploadedExcelImportBtn?.addEventListener('click', async () => {
+                const activeTargetField = tfInput.value?.trim();
+
+                if (!activeTargetField) {
+                    alert('Open a mapping row first so target field context is available.');
+                    return;
+                }
+
+                uploadedExcelImportBtn.disabled = true;
+                if (excelImportStatus) excelImportStatus.textContent = 'Importing from uploaded Excel seed…';
+
+                try {
+                    const formData = new FormData();
+                    formData.append('jobId', JOB_ID);
+                    formData.append('targetField', activeTargetField);
+                    formData.append('sourceField', sfInput.value ?? '');
+
+                    const res = await fetch('@Url.Action("ImportValueMappingsFromUploadedExcel", "Reports")', {
+                        method: 'POST',
+                        headers: { 'RequestVerificationToken': getCsrfToken() },
+                        body: formData
+                    });
+
+                    const payload = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                        const available = (payload.availableCodeDescriptions ?? []).slice(0, 10).join(', ');
+                        const suffix = available ? `\nAvailable: ${available}` : '';
+                        throw new Error((payload.error ?? `HTTP ${res.status}`) + suffix);
+                    }
+
+                    const rules = {};
+                    (payload.entries ?? []).forEach(entry => {
+                        if (entry.sourceValue) rules[entry.sourceValue] = entry.targetValue ?? '';
+                    });
+
+                    loadRows(rules);
+                    if (payload.sourceField && !sfInput.value) sfInput.value = payload.sourceField;
+                    if (excelImportStatus) excelImportStatus.textContent = `Imported ${payload.importedCount ?? Object.keys(rules).length} rule(s) from uploaded Excel.`;
+                } catch (err) {
+                    if (excelImportStatus) excelImportStatus.textContent = `Import failed: ${err.message}`;
+                    alert(`Excel import failed. ${err.message}`);
+                } finally {
+                    uploadedExcelImportBtn.disabled = false;
+                }
+            });
+
+            document.getElementById('valueMappingForm')?.addEventListener('submit', () => {
+                [...tbody.querySelectorAll('tr')].forEach((row, i) => {
+                    row.querySelector('.entry-source').name  = `Entries[${i}].SourceValue`;
+                    row.querySelector('.entry-target').name  = `Entries[${i}].TargetValue`;
+                    row.querySelector('.entry-notes').name   = `Entries[${i}].Notes`;
+
+                    // Fix checkbox binding: unchecked checkboxes don't submit, so use a hidden input
+                    const checkbox = row.querySelector('.entry-enabled');
+                    checkbox.removeAttribute('name'); // Don't submit the checkbox directly
+                    let hiddenEnabled = row.querySelector('.entry-enabled-hidden');
+                    if (!hiddenEnabled) {
+                        hiddenEnabled = document.createElement('input');
+                        hiddenEnabled.type = 'hidden';
+                        hiddenEnabled.className = 'entry-enabled-hidden';
+                        checkbox.parentElement.appendChild(hiddenEnabled);
+                    }
+                    hiddenEnabled.name = `Entries[${i}].IsEnabled`;
+                    hiddenEnabled.value = checkbox.checked ? 'true' : 'false';
+                });
+                updateCount();
+            });
+        }
+
+        // ── Re-AI Match ─────────────────────────────────────
+        document.addEventListener('click', async (e) => {
+            const btn = e.target.closest('.re-ai-btn');
+            if (!btn) return;
+            const tf = btn.dataset.targetField;
+            btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            try {
+                const res = await fetch('@Url.Action("ReAiMatch","Reports")', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': getCsrfToken() },
+                    body: `jobId=${encodeURIComponent(JOB_ID)}&targetField=${encodeURIComponent(tf)}`
+                });
+                btn.innerHTML = res.ok ? '<i class="fas fa-check text-success"></i>' : '<i class="fas fa-times text-danger"></i>';
+            } catch { btn.innerHTML = '<i class="fas fa-times text-danger"></i>'; }
+            setTimeout(() => { btn.disabled = false; btn.innerHTML = '<i class="fas fa-robot"></i>'; }, 2500);
+        });
+
+        // ── Value Mapping Tab (Tab 2) ───────────────────────
+        let vmLoaded = false;
+        let vmCandidates = [];
+        let vmReviewCurrent = null;
+
+        const vmReviewEl = document.getElementById('vmReviewModal');
+        const vmReviewModal = (vmReviewEl && typeof bootstrap !== 'undefined') ? new bootstrap.Modal(vmReviewEl) : null;
+
+        function statusBadge(status) {
+            const map = { 'Complete': 'bg-success', 'Partial': 'bg-warning text-dark', 'Pending': 'bg-secondary', 'AI Suggested': 'bg-info' };
+            return `<span class="badge ${map[status] ?? 'bg-secondary'}">${escHtml(status ?? 'Pending')}</span>`;
+        }
+
+        function updateVmKpis(candidates) {
+            document.getElementById('vmKpiTotal').textContent    = candidates.length;
+            document.getElementById('vmKpiComplete').textContent = candidates.filter(c => c.status === 'Complete').length;
+            document.getElementById('vmKpiPartial').textContent  = candidates.filter(c => c.status === 'Partial').length;
+            document.getElementById('vmKpiPending').textContent  = candidates.filter(c => !c.status || c.status === 'Pending').length;
+            document.getElementById('vmCandidateBadge').textContent = candidates.length;
+        }
+
+        function renderVmCandidates(candidates, tbody) {
+            tbody.innerHTML = '';
+            candidates.forEach((c, i) => {
+                const coverage = c.distinctValueCount > 0
+                    ? Math.round(((c.suggestedMappings?.length ?? 0) / c.distinctValueCount) * 100) : 0;
+                const badges = (c.distinctSourceValues ?? []).slice(0, 8)
+                    .map(v => `<span class="badge bg-light text-dark border me-1 mb-1">${escHtml(v)}</span>`).join('') +
+                    (c.distinctValueCount > 8 ? `<span class="text-muted small">+${c.distinctValueCount - 8} more</span>` : '');
+                const reason = c.candidateReason || 'Low Cardinality';
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><code class="small">${escHtml(c.sourceField)}</code></td>
+                    <td><code class="small">${escHtml(c.targetField)}</code></td>
+                    <td><span class="badge bg-secondary me-1">${c.distinctValueCount}</span>${badges}</td>
+                    <td>${c.suggestedMappings?.length ?? 0}</td>
+                    <td>
+                        <div class="progress" style="height:18px;min-width:80px">
+                            <div class="progress-bar ${coverage >= 100 ? 'bg-success' : coverage > 0 ? 'bg-warning' : 'bg-danger'}"
+                                 style="width:${coverage}%">${coverage}%</div>
+                        </div>
+                    </td>
+                    <td>${statusBadge(c.status)}</td>
+                    <td><span class="badge bg-light text-dark border">${escHtml(reason)}</span></td>
+                    <td><button type="button" class="btn btn-sm btn-outline-primary vm-review-btn" data-index="${i}">
+                        <i class="fas fa-edit me-1"></i>Review</button></td>`;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function loadVmCandidates() {
+            const tbody = document.getElementById('vmCandidatesTbody');
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4"><i class="fas fa-spinner fa-spin me-2"></i>Loading…</td></tr>';
+            try {
+                const res = await fetch(`@Url.Action("GetValueMappingCandidates","Reports")?jobId=${JOB_ID}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                vmCandidates = data.candidates ?? [];
+                updateVmKpis(vmCandidates);
+                if (!vmCandidates.length)
+                    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No candidates found. Click <strong>Discover Candidates</strong>.</td></tr>';
+                else
+                    renderVmCandidates(vmCandidates, tbody);
+                vmLoaded = true;
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-3"><i class="fas fa-exclamation-triangle me-2"></i>${escHtml(e.message)}</td></tr>`;
+                document.getElementById('vmCandidateBadge').textContent = '!';
+            }
+        }
+
+        document.getElementById('tab-valuemapping')?.addEventListener('shown.bs.tab', () => { if (!vmLoaded) loadVmCandidates(); });
+        document.getElementById('refreshVmBtn')?.addEventListener('click', () => { vmLoaded = false; loadVmCandidates(); });
+
+        // Review modal
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('.vm-review-btn');
+            if (!btn || !vmReviewModal) return;
+            vmReviewCurrent = vmCandidates[parseInt(btn.dataset.index, 10)];
+            if (!vmReviewCurrent) return;
+            document.getElementById('vmReviewSubtitle').textContent = `${vmReviewCurrent.sourceField} → ${vmReviewCurrent.targetField}`;
+            const distinctVals = vmReviewCurrent.distinctSourceValues ?? [];
+            const badges = distinctVals.map(v => `<span class="badge bg-light text-dark border me-1">${escHtml(v)}</span>`).join('');
+            document.getElementById('vmReviewDistinctBadges').innerHTML =
+                `<strong>${vmReviewCurrent.distinctValueCount} distinct source values:</strong> ${badges || '<em class="text-muted">none captured</em>'}`;
+
+            // Reset template status
+            const tmplStatus = document.getElementById('vmReviewTemplateStatus');
+            if (tmplStatus) tmplStatus.textContent = '';
+
+            // Populate rows: merge suggested mappings with uncovered distinct values
+            const rvTbody = document.getElementById('vmReviewTbody');
+            rvTbody.innerHTML = '';
+            const suggested = vmReviewCurrent.suggestedMappings ?? [];
+            if (suggested.length > 0) {
+                suggested.forEach(m => rvTbody.appendChild(buildReviewRow(m)));
+                const covered = new Set(suggested.map(m => (m.sourceValue ?? '').toLowerCase()));
+                distinctVals.forEach(v => {
+                    if (!covered.has(v.toLowerCase()))
+                        rvTbody.appendChild(buildReviewRow({ sourceValue: v }));
+                });
+            } else if (distinctVals.length > 0) {
+                // No AI suggestions — pre-fill left column with all distinct source values
+                distinctVals.forEach(v => rvTbody.appendChild(buildReviewRow({ sourceValue: v })));
+            } else {
+                rvTbody.appendChild(buildReviewRow());
+            }
+            vmReviewModal.show();
+        });
+
+        // Review modal — template loader
+        document.getElementById('vmReviewLoadTemplateBtn')?.addEventListener('click', async () => {
+            const tn = document.getElementById('vmReviewTemplateSelect')?.value;
+            const tmplStatus = document.getElementById('vmReviewTemplateStatus');
+            if (!tn) { if (tmplStatus) tmplStatus.textContent = 'Select a template first.'; return; }
+            if (!vmReviewCurrent) return;
+            // Special case: uploaded seed file — import directly from the uploaded Excel
+            if (tn === '__uploaded_seed__') {
+                if (tmplStatus) tmplStatus.textContent = 'Loading from uploaded seed…';
+                try {
+                    const fd = new FormData();
+                    fd.append('jobId', JOB_ID);
+                    fd.append('targetField', vmReviewCurrent.targetField ?? '');
+                    const seedRes = await fetch('@Url.Action("ImportValueMappingsFromUploadedExcel","Reports")', {
+                        method: 'POST',
+                        headers: { 'RequestVerificationToken': getCsrfToken() },
+                        body: fd
+                    });
+                    if (!seedRes.ok) { if (tmplStatus) tmplStatus.textContent = 'Seed file could not be read.'; return; }
+                    const seedPayload = await seedRes.json();
+                    const rvTbody = document.getElementById('vmReviewTbody');
+                    rvTbody.innerHTML = '';
+                    const entries = seedPayload.entries ?? [];
+                    const distinctVals = vmReviewCurrent.distinctSourceValues ?? [];
+                    if (entries.length > 0) {
+                        entries.forEach(e => rvTbody.appendChild(buildReviewRow({ sourceValue: e.sourceValue, targetValue: e.targetValue ?? '', confidence: 1.0 })));
+                        const covered = new Set(entries.map(e => (e.sourceValue ?? '').toLowerCase()));
+                        distinctVals.forEach(v => { if (!covered.has(v.toLowerCase())) rvTbody.appendChild(buildReviewRow({ sourceValue: v })); });
+                        if (tmplStatus) tmplStatus.textContent = `Loaded ${entries.length} rule(s) from seed file.`;
+                    } else {
+                        distinctVals.forEach(v => rvTbody.appendChild(buildReviewRow({ sourceValue: v })));
+                        if (tmplStatus) tmplStatus.textContent = 'No rules for this field in seed file — showing distinct values.';
+                    }
+                } catch (err) { if (tmplStatus) tmplStatus.textContent = `Error: ${err.message}`; }
+                return;
+            }
+            if (tmplStatus) tmplStatus.textContent = 'Loading…';
+            try {
+                const res = await fetch(`@Url.Action("LoadValueMappingTemplate","Reports")?jobId=${JOB_ID}&templateName=${encodeURIComponent(tn)}`);
+                if (!res.ok) { if (tmplStatus) tmplStatus.textContent = 'Could not load template.'; return; }
+                const payload = await res.json();
+                const tf = vmReviewCurrent.targetField;
+                const templateField = payload.fields?.find(f => f.targetField?.toLowerCase() === tf?.toLowerCase()) ?? payload.fields?.[0];
+                const rvTbody = document.getElementById('vmReviewTbody');
+                rvTbody.innerHTML = '';
+                const entries = (templateField?.entries ?? []).filter(e => e.isEnabled !== false && e.sourceValue);
+                const distinctVals = vmReviewCurrent.distinctSourceValues ?? [];
+                if (entries.length > 0) {
+                    entries.forEach(e => rvTbody.appendChild(buildReviewRow({ sourceValue: e.sourceValue, targetValue: e.targetValue ?? '', confidence: 1.0 })));
+                    const covered = new Set(entries.map(e => (e.sourceValue ?? '').toLowerCase()));
+                    distinctVals.forEach(v => {
+                        if (!covered.has(v.toLowerCase()))
+                            rvTbody.appendChild(buildReviewRow({ sourceValue: v }));
+                    });
+                    if (tmplStatus) tmplStatus.textContent = `Loaded ${entries.length} rule(s) from "${tn}".`;
+                } else {
+                    distinctVals.forEach(v => rvTbody.appendChild(buildReviewRow({ sourceValue: v })));
+                    if (tmplStatus) tmplStatus.textContent = `No rules for this field in "${tn}" — showing distinct values.`;
+                }
+            } catch (err) {
+                if (tmplStatus) tmplStatus.textContent = `Error: ${err.message}`;
+            }
+        });
+
+        function buildReviewRow(m = {}) {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><input type="text" class="form-control form-control-sm rv-source" value="${escHtml(m.sourceValue ?? '')}" /></td>
+                <td><input type="text" class="form-control form-control-sm rv-target" value="${escHtml(m.targetValue ?? '')}" /></td>
+                <td class="small text-muted">${m.confidence != null ? Number(m.confidence).toFixed(2) : '—'}</td>
+                <td class="text-center">${m.isAiSuggested ? '<i class="fas fa-robot text-warning" title="AI suggested"></i>' : ''}</td>
+                <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger rv-rm"><i class="fas fa-trash"></i></button></td>`;
+            row.querySelector('.rv-rm').addEventListener('click', () => row.remove());
+            return row;
+        }
+
+        document.getElementById('vmReviewAddRowBtn')?.addEventListener('click', () => {
+            document.getElementById('vmReviewTbody').appendChild(buildReviewRow());
+        });
+
+        document.getElementById('vmReviewSaveBtn')?.addEventListener('click', async () => {
+            if (!vmReviewCurrent) return;
+            const rows = [...document.getElementById('vmReviewTbody').querySelectorAll('tr')];
+            const mappings = rows.map(r => ({
+                sourceValue: r.querySelector('.rv-source')?.value ?? '',
+                targetValue: r.querySelector('.rv-target')?.value ?? '',
+                confidence: 1.0,
+                isAiSuggested: false
+            })).filter(r => r.sourceValue);
+            const saveBtn = document.getElementById('vmReviewSaveBtn');
+            saveBtn.disabled = true;
+            try {
+                const res = await fetch(`@Url.Action("SaveCandidateMappings","Reports")?jobId=${encodeURIComponent(JOB_ID)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': getCsrfToken() },
+                    body: JSON.stringify({ sourceField: vmReviewCurrent.sourceField, targetField: vmReviewCurrent.targetField, mappings })
+                });
+                if (res.ok) { vmReviewModal?.hide(); vmLoaded = false; loadVmCandidates(); }
+                else {
+                    const err = await res.json().catch(() => ({}));
+                    alert(`Save failed: ${err.error || res.statusText || 'Unknown error'}`);
+                }
+            } catch (e) { alert(`Save failed: ${e.message}`); }
+            finally { saveBtn.disabled = false; }
+        });
+
+        document.getElementById('genVmTemplateBtn')?.addEventListener('click', async () => {
+            const btn = document.getElementById('genVmTemplateBtn');
+            const status = document.getElementById('vmAiStatus');
+            btn.disabled = true; status.textContent = 'Generating AI suggestions…';
+            try {
+                const res = await fetch('@Url.Action("GenerateValueMappingTemplate","Reports")', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': getCsrfToken() },
+                    body: `jobId=${encodeURIComponent(JOB_ID)}`
+                });
+                status.textContent = res.ok ? 'Done! Refreshing…' : 'AI generation failed.';
+                if (res.ok) { vmLoaded = false; loadVmCandidates(); }
+            } catch (e) { status.textContent = `Error: ${e.message}`; }
+            finally { btn.disabled = false; }
+        });
+
+        // ── Transformation Preview (Modal 3) ────────────────
+        const txPreviewEl = document.getElementById('txPreviewModal');
+        const txPreviewModal = (txPreviewEl && typeof bootstrap !== 'undefined') ? new bootstrap.Modal(txPreviewEl) : null;
+
+        document.querySelectorAll('.preview-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const count = btn.dataset.count;
+                document.getElementById('previewStatus').textContent = 'Loading…';
+                document.getElementById('txPreviewContent').innerHTML =
+                    '<div class="text-center py-4"><i class="fas fa-spinner fa-spin me-2"></i>Loading preview…</div>';
+                txPreviewModal?.show();
+                try {
+                    const res = await fetch(`@Url.Action("PreviewTransformations","Reports")?jobId=${JOB_ID}&count=${count}`);
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const rows = await res.json();
+                    document.getElementById('previewStatus').textContent = `Showing ${rows.length} row(s)`;
+                    renderTxPreview(rows);
+                } catch (e) {
+                    document.getElementById('previewStatus').textContent = `Error: ${e.message}`;
+                    document.getElementById('txPreviewContent').innerHTML = `<div class="alert alert-danger">${escHtml(e.message)}</div>`;
+                }
+            });
+        });
+
+        function renderTxPreview(rows) {
+            if (!rows.length) {
+                document.getElementById('txPreviewContent').innerHTML = '<div class="alert alert-info">No preview data available.</div>';
+                return;
+            }
+            const fields = Object.keys(rows[0]?.before ?? {});
+            let html = `<div class="table-responsive"><table class="table table-sm table-bordered align-middle" style="font-size:.8rem">
+                <thead class="table-light"><tr><th>#</th>`;
+            fields.forEach(f => html += `<th>${escHtml(f)}<br><span class="text-muted" style="font-size:.7rem">before → after</span></th>`);
+            html += '</tr></thead><tbody>';
+            rows.forEach((row, i) => {
+                html += `<tr><td class="text-muted">${i+1}</td>`;
+                fields.forEach(f => {
+                    const bv = String(row.before?.[f] ?? '');
+                    const av = String(row.after?.[f] ?? '');
+                    const changed = bv !== av;
+                    html += `<td${changed ? ' class="table-warning"' : ''}>
+                        <div class="text-muted">${escHtml(bv)}</div>
+                        ${changed ? `<div class="text-success fw-semibold">→ ${escHtml(av)}</div>` : ''}
+                    </td>`;
+                });
+                html += '</tr>';
+            });
+            html += '</tbody></table></div>';
+            document.getElementById('txPreviewContent').innerHTML = html;
+        }
+
+        // ── Eager load candidate count on page load ─────────
+        fetch(`@Url.Action("GetValueMappingCandidates","Reports")?jobId=${JOB_ID}`)
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (!data) { document.getElementById('vmCandidateBadge').textContent = '0'; return; }
+                vmCandidates = data.candidates ?? [];
+                updateVmKpis(vmCandidates);
+                const tbody = document.getElementById('vmCandidatesTbody');
+                if (vmCandidates.length) renderVmCandidates(vmCandidates, tbody);
+                else tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No candidates found. Click <strong>Discover Candidates</strong>.</td></tr>';
+                vmLoaded = true;
+            })
+            .catch(() => { document.getElementById('vmCandidateBadge').textContent = '?'; });
+
+        // ═══════════════════════════════════════════════════════════════
+        // Import Structural Mapping (upload panel — JS fetch replaces nested form)
+        // ═══════════════════════════════════════════════════════════════
+        document.getElementById('importMappingSubmitBtn')?.addEventListener('click', async () => {
+            const fileInput = document.getElementById('importMappingFileInput');
+            const statusEl  = document.getElementById('importMappingStatus');
+            const file = fileInput?.files?.[0];
+            if (!file) { statusEl.innerHTML = '<span class="text-warning">Select an Excel file first.</span>'; return; }
+            statusEl.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Importing…';
+            const fd = new FormData();
+            fd.append('JobId', JOB_ID);
+            fd.append('MappingFile', file);
+            try {
+                const res = await fetch('@Url.Action("ImportStructuralMapping","Reports")', {
+                    method: 'POST',
+                    headers: { 'RequestVerificationToken': getCsrfToken() },
+                    body: fd
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                statusEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Imported. Reloading…</span>';
+                setTimeout(() => window.location.reload(), 1200);
+            } catch (err) {
+                statusEl.innerHTML = `<span class="text-danger"><i class="fas fa-times-circle me-1"></i>Import failed: ${escHtml(err.message)}</span>`;
+            }
+        });
+
+        // ═══════════════════════════════════════════════════════════════
+        // ENHANCEMENT 1 — Delta File Upload
+        // ═══════════════════════════════════════════════════════════════
+
+        const deltaSourceInput = document.getElementById('deltaSourceFileInput');
+        const deltaTargetInput = document.getElementById('deltaTargetFileInput');
+        const deltaStatus = document.getElementById('deltaUploadStatus');
+
+        document.getElementById('deltaUploadSourceBtn')?.addEventListener('click', () => deltaSourceInput?.click());
+        document.getElementById('deltaUploadTargetBtn')?.addEventListener('click', () => deltaTargetInput?.click());
+        document.querySelector('.delta-upload-src-vm')?.addEventListener('click', () => deltaSourceInput?.click());
+        document.querySelector('.delta-upload-tgt-vm')?.addEventListener('click', () => deltaTargetInput?.click());
+
+        deltaSourceInput?.addEventListener('change', async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            await performDeltaUpload(file, 'source');
+            e.target.value = '';
+        });
+
+        deltaTargetInput?.addEventListener('change', async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            await performDeltaUpload(file, 'target');
+            e.target.value = '';
+        });
+
+        async function performDeltaUpload(file, type) {
+            if (deltaStatus) deltaStatus.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Uploading & processing…';
+            const formData = new FormData();
+            formData.append('jobId', JOB_ID);
+            formData.append('file', file);
+
+            const url = type === 'source'
+                ? '@Url.Action("DeltaUploadSource", "Reports")'
+                : '@Url.Action("DeltaUploadTargetSchema", "Reports")';
+
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'RequestVerificationToken': getCsrfToken() },
+                    body: formData
+                });
+                const result = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(result.error || `HTTP ${res.status}`);
+                if (deltaStatus) {
+                    deltaStatus.innerHTML = `<span class="text-success">
+                        <i class="fas fa-check-circle me-1"></i>
+                        <strong>${escHtml(result.fileName)}</strong> uploaded.
+                        Rows Added: ${result.rowsAdded ?? 0} |
+                        Mappings Updated: ${result.mappingsUpdated ?? 0} |
+                        Time: ${(result.timeProcessedMs ?? 0).toFixed(0)}ms
+                    </span>`;
+                }
+                // Refresh after 3s
+                setTimeout(() => window.location.reload(), 3000);
+            } catch (err) {
+                if (deltaStatus) deltaStatus.innerHTML = `<span class="text-danger"><i class="fas fa-times-circle me-1"></i>${escHtml(err.message)}</span>`;
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // ENHANCEMENT 2 — Reconciliation Configuration
+        // ═══════════════════════════════════════════════════════════════
+
+        let reconFields = [];
+        let reconLoaded = false;
+
+        document.getElementById('tab-reconciliation')?.addEventListener('shown.bs.tab', () => { if (!reconLoaded) loadReconConfig(); });
+        document.getElementById('suggestReconFieldsBtn')?.addEventListener('click', loadReconConfig);
+        document.getElementById('refreshReconBtn')?.addEventListener('click', loadReconConfig);
+
+        async function loadReconConfig() {
+            const tbody = document.getElementById('reconFieldsTbody');
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i>Loading…</td></tr>';
+            try {
+                const res = await fetch(`@Url.Action("GetReconciliationConfig","Reports")?jobId=${JOB_ID}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                reconFields = (data.fields ?? []).map((f, i) => ({...f, priority: f.priority || i + 1, validationType: f.validationType || 'COUNT'}));
+                renderReconFields();
+                reconLoaded = true;
+                // Also load dashboard
+                loadReconDashboard();
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-3">${escHtml(e.message)}</td></tr>`;
+            }
+        }
+
+        async function loadReconDashboard() {
+            try {
+                const res = await fetch(`@Url.Action("GetReconciliationDashboard","Reports")?jobId=${JOB_ID}`);
+                if (!res.ok) return;
+                const d = await res.json();
+                document.getElementById('reconFieldsSelected').textContent = d.fieldsSelected ?? '—';
+                document.getElementById('reconCoverage').textContent = d.coveragePercent != null ? `${d.coveragePercent}%` : '—';
+                document.getElementById('reconMatched').textContent = d.matchedRecords ?? '—';
+                document.getElementById('reconFailed').textContent = d.failedRecords ?? '—';
+            } catch {}
+        }
+
+        function renderReconFields() {
+            const tbody = document.getElementById('reconFieldsTbody');
+            tbody.innerHTML = '';
+            if (!reconFields.length) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No reconciliation fields configured yet.</td></tr>';
+                return;
+            }
+            reconFields.sort((a, b) => a.priority - b.priority).forEach((f, i) => {
+                const vt = (f.validationType || 'COUNT').toUpperCase();
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="text-muted small">${i + 1}</td>
+                    <td><input type="text" class="form-control form-control-sm recon-field-name" value="${escHtml(f.fieldName)}" /></td>
+                    <td>
+                        <select class="form-select form-select-sm recon-validation-type" style="width:100px">
+                            <option value="COUNT" ${vt === 'COUNT' ? 'selected' : ''}>COUNT</option>
+                            <option value="SUM" ${vt === 'SUM' ? 'selected' : ''}>SUM</option>
+                        </select>
+                    </td>
+                    <td><input type="number" class="form-control form-control-sm recon-priority" value="${f.priority}" min="1" style="width:70px" /></td>
+                    <td class="text-center"><input type="checkbox" class="form-check-input recon-mandatory" ${f.isMandatory ? 'checked' : ''} /></td>
+                    <td><span class="badge bg-light text-dark border">${escHtml(f.reason || '')}</span></td>
+                    <td class="small text-muted">${f.confidence != null ? Number(f.confidence).toFixed(2) : '—'}</td>
+                    <td><button type="button" class="btn btn-sm btn-outline-danger recon-remove-btn"><i class="fas fa-trash"></i></button></td>`;
+                tr.querySelector('.recon-remove-btn').addEventListener('click', () => { tr.remove(); collectReconFields(); });
+                tbody.appendChild(tr);
+            });
+        }
+
+        function collectReconFields() {
+            reconFields = [...document.getElementById('reconFieldsTbody').querySelectorAll('tr')].map((tr, i) => ({
+                fieldName: tr.querySelector('.recon-field-name')?.value ?? '',
+                priority: parseInt(tr.querySelector('.recon-priority')?.value ?? i + 1),
+                isMandatory: tr.querySelector('.recon-mandatory')?.checked ?? false,
+                validationType: tr.querySelector('.recon-validation-type')?.value ?? 'COUNT',
+                reason: 'User Configured',
+                confidence: null
+            })).filter(f => f.fieldName);
+        }
+
+        document.getElementById('addReconFieldBtn')?.addEventListener('click', () => {
+            reconFields.push({ fieldName: '', priority: reconFields.length + 1, isMandatory: false, validationType: 'COUNT', reason: 'User Added', confidence: null });
+            renderReconFields();
+        });
+
+        document.getElementById('saveReconConfigBtn')?.addEventListener('click', async () => {
+            collectReconFields();
+            const btn = document.getElementById('saveReconConfigBtn');
+            const status = document.getElementById('reconStatus');
+            btn.disabled = true;
+            status.textContent = 'Saving…';
+            try {
+                const res = await fetch(`@Url.Action("SaveReconciliationConfig","Reports")?jobId=${encodeURIComponent(JOB_ID)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': getCsrfToken() },
+                    body: JSON.stringify({ fields: reconFields })
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.error || `HTTP ${res.status}`);
+                }
+                const result = await res.json();
+                status.innerHTML = `<span class="text-success"><i class="fas fa-check me-1"></i>Saved ${result.saved} field(s). Keys: ${(result.reconciliationKeys ?? []).join(', ')}</span>`;
+                loadReconDashboard();
+            } catch (e) { status.innerHTML = `<span class="text-danger">${escHtml(e.message)}</span>`; }
+            finally { btn.disabled = false; }
+        });
+
+        document.getElementById('downloadReconJsonBtn')?.addEventListener('click', async () => {
+            collectReconFields();
+            const config = { reconciliationKeys: reconFields.filter(f => f.fieldName).map(f => f.fieldName) };
+            const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'reconciliation_config.json'; a.click();
+            URL.revokeObjectURL(url);
+        });
+
+        // ═══════════════════════════════════════════════════════════════
+        // ENHANCEMENT 3 — Transformation Overrides
+        // ═══════════════════════════════════════════════════════════════
+
+        let overrideData = [];
+        let overrideCatalog = [];
+
+        document.getElementById('loadOverridesBtn')?.addEventListener('click', loadOverrides);
+
+        async function loadOverrides() {
+            const tbody = document.getElementById('overridesTbody');
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i>Loading…</td></tr>';
+            try {
+                const res = await fetch(`@Url.Action("GetTransformationOverrides","Reports")?jobId=${JOB_ID}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                overrideData = data.overrides ?? [];
+                overrideCatalog = data.catalog ?? [];
+                renderOverrides();
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-3">${escHtml(e.message)}</td></tr>`;
+            }
+        }
+
+        function renderOverrides() {
+            const tbody = document.getElementById('overridesTbody');
+            tbody.innerHTML = '';
+            if (!overrideData.length) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No transformations found.</td></tr>';
+                return;
+            }
+            overrideData.forEach((o, i) => {
+                const tr = document.createElement('tr');
+                const catalogOptions = overrideCatalog.map(c =>
+                    `<option value="${escHtml(c)}" ${c === o.overrideTransformation ? 'selected' : ''}>${escHtml(c)}</option>`).join('');
+                const confClass = o.confidence >= 0.90 ? 'text-success' : o.confidence >= 0.70 ? 'text-warning' : 'text-danger';
+                const statusBadge = o.status === 'User_Override'
+                    ? '<span class="badge bg-primary">Overridden</span>'
+                    : o.status === 'Approved'
+                        ? '<span class="badge bg-success">Approved</span>'
+                        : '<span class="badge bg-secondary">AI Suggested</span>';
+                tr.innerHTML = `
+                    <td><code class="small">${escHtml(o.targetField)}</code></td>
+                    <td class="small text-muted">${escHtml(o.sourceField)}</td>
+                    <td><span class="badge bg-light text-dark border">${escHtml(o.suggestedTransformation)}</span></td>
+                    <td class="${confClass} small">${Number(o.confidence).toFixed(2)}</td>
+                    <td>
+                        <select class="form-select form-select-sm override-select" data-index="${i}">
+                            <option value="">— Keep AI Suggested —</option>
+                            ${catalogOptions}
+                        </select>
+                    </td>
+                    <td>
+                        <input type="text" class="form-control form-control-sm override-expression" data-index="${i}"
+                            value="${escHtml(o.customExpression ?? '')}"
+                            placeholder="e.g. LEFT(source,10)" ${o.overrideTransformation === 'CUSTOM' || o.overrideTransformation === 'CONCAT' ? '' : 'disabled'} />
+                    </td>
+                    <td>${statusBadge}</td>`;
+                // Enable expression when CUSTOM or CONCAT is selected
+                const sel = tr.querySelector('.override-select');
+                const expr = tr.querySelector('.override-expression');
+                sel?.addEventListener('change', () => {
+                    expr.disabled = !(sel.value === 'CUSTOM' || sel.value === 'CONCAT' || sel.value === 'HARDCODED');
+                    if (expr.disabled) expr.value = '';
+                });
+                tbody.appendChild(tr);
+            });
+        }
+
+        document.getElementById('saveOverridesBtn')?.addEventListener('click', async () => {
+            const btn = document.getElementById('saveOverridesBtn');
+            btn.disabled = true;
+            // Collect overrides
+            const rows = [...document.getElementById('overridesTbody').querySelectorAll('tr')];
+            const overrides = overrideData.map((o, i) => {
+                const row = rows[i];
+                const sel = row?.querySelector('.override-select');
+                const expr = row?.querySelector('.override-expression');
+                return {
+                    ...o,
+                    overrideTransformation: sel?.value ?? '',
+                    customExpression: expr?.value ?? ''
+                };
+            });
+            try {
+                const res = await fetch(`@Url.Action("SaveTransformationOverrides","Reports")?jobId=${encodeURIComponent(JOB_ID)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': getCsrfToken() },
+                    body: JSON.stringify({ overrides })
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.error || `HTTP ${res.status}`);
+                }
+                const result = await res.json();
+                const statusEl = document.getElementById('overridesSaveStatus');
+                if (statusEl) statusEl.innerHTML = `<span class="text-success"><i class="fas fa-check-circle me-1"></i>Saved — ${result.overridden} override(s) applied.</span>`;
+                setTimeout(() => { if (statusEl) statusEl.innerHTML = ''; }, 5000);
+                loadOverrides();
+            } catch (e) {
+                const statusEl = document.getElementById('overridesSaveStatus');
+                if (statusEl) statusEl.innerHTML = `<span class="text-danger"><i class="fas fa-times-circle me-1"></i>Save failed: ${escHtml(e.message)}</span>`;
+            }
+            finally { btn.disabled = false; }
+        });
+
+    })();
+    </script>
+}

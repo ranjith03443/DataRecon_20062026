@@ -1,0 +1,80 @@
+# ── .NET / ASP.NET Core ──────────────────────────────────────────────────────
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.swp
+
+# Published output
+publish/
+out/
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+project.lock.json
+
+# Runtime config overrides (keep appsettings.json, ignore environment-specific)
+appsettings.Development.json
+appsettings.*.json
+!appsettings.json
+
+# SQLite databases
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+logs/
+*.log
+
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+*.xml
+
+# Python logs
+python_logs/
+
+# ── Environment / secrets ─────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+Add_actual_EnvFile_here.txt
+
+# AI config contains API keys — keep a local copy outside git
+DataReconciliation/config/ai_settings.json
+
+# ── Workflow job artifacts ────────────────────────────────────────────────────
+# Job output is ephemeral; keep the folder structure but not the data
+DataReconciliation/workflow/
+
+# ── IDE / OS ──────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Documents & scratch files ─────────────────────────────────────────────────
+*.docx
+*.pdf
+*.html
+dotnet-install.ps1
+

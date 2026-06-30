@@ -1,0 +1,24 @@
+semantic_cache:
+  enabled: true
+  ttl_seconds: 3600
+  max_size: 1000
+  min_confidence_to_cache: 0.90
+
+  cache_types:
+    semantic_mapping: true
+    schema_enrichment: true
+    rule_inference: true
+    embeddings: true
+    rag_retrieval: true
+
+  key_strategy:
+    include_source_hash: true
+    include_target_hash: true
+    include_rules_hash: true
+    include_prompt_version: true
+
+  logging:
+    log_hits: true
+    log_misses: true
+    log_evictions: true
+    log_expirations: true

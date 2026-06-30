@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(cd \"d:\\\\VSCoding\\\\DataReconciliation\\\\DataReconciliation\"; dotnet build --no-incremental -verbosity:quiet 2>&1 | Where-Object { $_ -match \"error|Error\" } | Select-Object -Last 20)",
+      "Bash(dotnet build *)",
+      "PowerShell(cd \"d:\\\\VSCoding\\\\DataReconciliation\"; dotnet build DataReconciliation/DataReconciliation.csproj --nologo -verbosity:quiet 2>&1 | Where-Object { $_ -match \"error CS\" } | Select-Object -First 20)",
+      "PowerShell(cd \"d:\\\\VSCoding\\\\DataReconciliation\"; dotnet build DataReconciliation/DataReconciliation.csproj --nologo 2>&1 | Out-String | Select-String -Pattern \"error CS\\\\d+\" -AllMatches | ForEach-Object { $_.Matches } | Select-Object -First 10)",
+      "PowerShell(cd \"d:\\\\VSCoding\\\\DataReconciliation\"; $result = dotnet build DataReconciliation/DataReconciliation.csproj --nologo 2>&1; $result | ForEach-Object { if \\($_ -match \"error\"\\) { $_ } } | Select-Object -First 25)",
+      "PowerShell(Get-Item \"d:\\\\VSCoding\\\\DataReconciliation\\\\DataReconciliation\\\\workflow\\\\JOB_20260630022026_190FB2\\\\artifacts\\\\reconciliation_result.json\" | Select-Object LastWriteTime; Get-Content \"d:\\\\VSCoding\\\\DataReconciliation\\\\DataReconciliation\\\\workflow\\\\JOB_20260630022026_190FB2\\\\artifacts\\\\reconciliation_result.json\" | ConvertFrom-Json | Select-Object GeneratedAt, @{N='SourceFieldCounts keys';E={$_.SourceFieldCounts.PSObject.Properties.Name -join ', '}}, @{N='TargetFieldCounts keys';E={$_.TargetFieldCounts.PSObject.Properties.Name -join ', '}}, @{N='FieldTotals keys';E={$_.FieldTotals.PSObject.Properties.Name -join ', '}})"
+    ]
+  }
+}

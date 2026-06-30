@@ -1,0 +1,58 @@
+logging:
+  level: DEBUG
+  format: "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} | {message}"
+  colorize: false
+  serialize: false
+
+  log_directory: "python_logs"
+
+  files:
+    api:
+      path: "python_logs/api.log"
+      level: INFO
+      rotation: "100 MB"
+      retention: "30 days"
+      compression: "gz"
+
+    semantic_mapping:
+      path: "python_logs/semantic_mapping.log"
+      level: DEBUG
+      rotation: "100 MB"
+      retention: "30 days"
+      compression: "gz"
+
+    rag_retrieval:
+      path: "python_logs/rag_retrieval.log"
+      level: DEBUG
+      rotation: "100 MB"
+      retention: "30 days"
+      compression: "gz"
+
+    embeddings:
+      path: "python_logs/embeddings.log"
+      level: DEBUG
+      rotation: "50 MB"
+      retention: "30 days"
+      compression: "gz"
+
+    cache:
+      path: "python_logs/cache.log"
+      level: DEBUG
+      rotation: "50 MB"
+      retention: "30 days"
+      compression: "gz"
+
+    errors:
+      path: "python_logs/errors.log"
+      level: ERROR
+      rotation: "100 MB"
+      retention: "90 days"
+      compression: "gz"
+
+  structured_fields:
+    - job_id
+    - request_id
+    - workflow_step
+    - model_name
+    - provider_name
+    - correlation_id

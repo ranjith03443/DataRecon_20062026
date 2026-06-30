@@ -1,0 +1,19 @@
+vector_store:
+  provider: chromadb
+
+  chromadb:
+    persist_directory: "./data/chromadb"
+    collection_names:
+      historical_mappings: "historical_mappings"
+      business_rules: "business_rules"
+      semantic_glossary: "semantic_glossary"
+      target_schema: "target_schema"
+      field_descriptions: "field_descriptions"
+      onboarding_metadata: "onboarding_metadata"
+    distance_function: "cosine"
+    max_results: 10
+
+  search:
+    default_top_k: 5
+    min_relevance_score: 0.70
+    enable_metadata_filter: true

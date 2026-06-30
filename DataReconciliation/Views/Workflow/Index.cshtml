@@ -1,0 +1,137 @@
+@model List<DataReconciliation.Application.DTOs.WorkflowJobDto>
+@{
+    ViewData["Title"] = "Workflow Dashboard";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-tachometer-alt me-2 text-primary"></i>Workflow Dashboard</h2>
+    <a asp-action="Create" class="btn btn-primary">
+        <i class="fas fa-plus me-1"></i>New Workflow
+    </a>
+</div>
+
+<!-- Stats Row -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-bg-primary">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-briefcase fa-2x me-3"></i>
+                    <div>
+                        <div class="fs-4 fw-bold">@Model.Count</div>
+                        <div class="small">Total Jobs</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-success">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-check-circle fa-2x me-3"></i>
+                    <div>
+                        <div class="fs-4 fw-bold">@Model.Count(j => j.Status == "Completed")</div>
+                        <div class="small">Completed</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-warning">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-spinner fa-2x me-3"></i>
+                    <div>
+                        <div class="fs-4 fw-bold">@Model.Count(j => j.Status != "Completed" && j.Status != "Failed" && j.Status != "PartialSuccess")</div>
+                        <div class="small">In Progress</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-danger">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-exclamation-circle fa-2x me-3"></i>
+                    <div>
+                        <div class="fs-4 fw-bold">@Model.Count(j => j.Status == "Failed")</div>
+                        <div class="small">Failed</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Jobs Table -->
+<div class="card">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="fas fa-list me-2"></i>Workflow Jobs</h5>
+    </div>
+    <div class="card-body p-0">
+        @if (!Model.Any())
+        {
+            <div class="text-center py-5 text-muted">
+                <i class="fas fa-inbox fa-3x mb-3"></i>
+                <p>No workflow jobs yet. <a asp-action="Create">Create your first workflow</a>.</p>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Job ID</th>
+                            <th>Name</th>
+                            <th>Status</th>
+                            <th>Current Step</th>
+                            <th>Created</th>
+                            <th>Completed</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var job in Model)
+                        {
+                            <tr>
+                                <td><code class="small">@job.JobId</code></td>
+                                <td>@job.JobName</td>
+                                <td>
+                                    @{
+                                        var badgeClass = job.Status switch
+                                        {
+                                            "Completed" => "bg-success",
+                                            "InProgress" => "bg-primary",
+                                            "Failed" => "bg-danger",
+                                            "PartialSuccess" => "bg-warning text-dark",
+                                            "AwaitingMappingApproval" => "bg-warning text-dark",
+                                            "Replaying" => "bg-info text-dark",
+                                            _ => "bg-secondary"
+                                        };
+                                    }
+                                    <span class="badge @badgeClass">@job.Status</span>
+                                </td>
+                                <td><span class="badge bg-light text-dark border">@job.CurrentStep</span></td>
+                                <td class="small">@job.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td class="small">@(job.CompletedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</td>
+                                <td>
+                                    <a asp-action="Details" asp-route-jobId="@job.JobId" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a asp-controller="Reports" asp-action="Reconciliation" asp-route-jobId="@job.JobId"
+                                       class="btn btn-sm btn-outline-info ms-1">
+                                        <i class="fas fa-chart-bar"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

@@ -1,0 +1,24 @@
+{
+  "operations": [
+    "DATE_FORMAT",
+    "TRUNCATE",
+    "PAD_LEFT",
+    "PAD_RIGHT",
+    "VALUE_MAPPING",
+    "MASK",
+    "DECIMAL_FORMAT",
+    "CONCAT",
+    "SPLIT",
+    "DEFAULT_VALUE",
+    "NULL_REPLACEMENT",
+    "UPPERCASE",
+    "LOWERCASE",
+    "PROPERCASE",
+    "REMOVE_SPECIAL_CHARACTERS",
+    "BOOLEAN_MAPPING",
+    "CURRENCY_NORMALIZATION",
+    "FIXED_WIDTH_FORMAT",
+    "STRING_TO_NUMERIC",
+    "NUMERIC_TO_STRING"
+  ]
+}
