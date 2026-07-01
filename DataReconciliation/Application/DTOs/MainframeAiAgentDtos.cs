@@ -25,6 +25,24 @@ namespace DataReconciliation.Application.DTOs
         public List<Dictionary<string, object?>>? FieldMappings { get; set; }
         public Dictionary<string, object?>? TargetSchema { get; set; }
 
+        // Generation metadata — populated by MainframeAssetGenerationService when UseAiMode=true
+        public string? ProgramName { get; set; }
+        public string? RecordName { get; set; }
+        public string? JobName { get; set; }
+        public int? TotalRecordLength { get; set; }
+        public List<Dictionary<string, object?>>? FieldDetails { get; set; }
+
+        /// <summary>
+        /// Distinct source datasets feeding this job.
+        /// Each entry: { datasetId, fields: [sourceFieldName, ...], fieldCount }.
+        /// Used by AI to generate one SELECT/FD per source file.
+        /// </summary>
+        public List<Dictionary<string, object?>>? SourceDatasets { get; set; }
+
+        // Recon-program metadata — populated by ReconProgramGenerationService when UseAiMode=true
+        public int? ExpectedRecordCount { get; set; }
+        public List<Dictionary<string, object?>>? ReconChecks { get; set; }
+
         public string? RequestId { get; set; }
         public string? UserId { get; set; }
     }

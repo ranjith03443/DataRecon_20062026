@@ -4,9 +4,13 @@
     ViewData["Title"] = "Mainframe Development Centre";
     var assetModel = Model.AssetPageModel ?? new DataReconciliation.Application.DTOs.MainframeAssetPageDto { JobId = Model.JobId };
     var ar = assetModel.AssetResult;
+    var reconModel = Model.ReconPageModel ?? new DataReconciliation.Application.DTOs.ReconProgramPageDto { JobId = Model.JobId };
+    var rr = reconModel.Result;
     var activeTab = "tab-artifacts";
     if (TempData["AssetSuccess"] != null || TempData["AssetError"] != null || ar != null)
         activeTab = "tab-assets";
+    if (TempData["ReconSuccess"] != null || TempData["ReconError"] != null || rr != null)
+        activeTab = "tab-recon";
 }
 
 @* â”€â”€ Page header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ *@
@@ -43,6 +47,20 @@
 {
     <div class="alert alert-danger alert-dismissible fade show">
         <i class="fas fa-exclamation-triangle me-2"></i>@TempData["AssetError"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["ReconSuccess"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show">
+        <i class="fas fa-circle-check me-2"></i>@TempData["ReconSuccess"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (TempData["ReconError"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show">
+        <i class="fas fa-exclamation-triangle me-2"></i>@TempData["ReconError"]
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
 }
@@ -87,6 +105,15 @@
             <i class="fas fa-layer-group me-2 text-info"></i>
             <span class="fw-semibold">Mainframe Assets</span>
             <br /><small class="fw-normal text-muted">COBOL | JCL | Samples</small>
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link @(activeTab == "tab-recon" ? "active" : "")"
+                id="btn-tab-recon" data-bs-toggle="tab" data-bs-target="#tab-recon"
+                type="button" role="tab">
+            <i class="fas fa-scale-balanced me-2 text-danger"></i>
+            <span class="fw-semibold">Recon Program</span>
+            <br /><small class="fw-normal text-muted">COBOL | JCL | Spec</small>
         </button>
     </li>
     <li class="nav-item" role="presentation">
@@ -307,6 +334,18 @@
                                 </select>
                             </div>
                         </div>
+                        <div class="d-flex align-items-center gap-3 mt-3 mb-2">
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" role="switch"
+                                       name="Request.UseAiMode" value="true" id="chkAiMode" />
+                                <input type="hidden" name="Request.UseAiMode" value="false" />
+                                <label class="form-check-label fw-semibold" for="chkAiMode">
+                                    <i class="fas fa-robot text-warning me-1"></i>AI Mode
+                                    <span class="badge bg-warning text-dark ms-1" style="font-size:0.7rem;">COBOL &amp; JCL</span>
+                                </label>
+                            </div>
+                            <small class="text-muted">When on, AI generates the actual transformation program instead of a static skeleton. Requires Python AI service.</small>
+                        </div>
                         <button type="submit" class="btn btn-info text-white">
                             <i class="fas fa-layer-group me-2"></i>Generate Mainframe Assets
                         </button>
@@ -329,7 +368,14 @@
                 </div>
                 <div class="alert alert-warning py-2 mb-3 d-flex align-items-center gap-2">
                     <i class="fas fa-triangle-exclamation flex-shrink-0"></i>
-                    <span>Please review the generated COBOL and JCL files before executing.</span>
+                    @if (ar.CobolAiGenerated || ar.JclAiGenerated)
+                    {
+                        <span><strong>AI Mode was used.</strong> Review all generated code carefully — verify transformation logic, update JCL dataset names, and test on a non-production environment before submitting to the mainframe.</span>
+                    }
+                    else
+                    {
+                        <span>Please review the generated COBOL and JCL files before executing. Static generation was used — all transformation logic requires manual implementation.</span>
+                    }
                 </div>
                 <div class="d-flex gap-2 flex-wrap mb-4">
                     @if (ar.CopybookFileName != null)
@@ -344,6 +390,14 @@
                         <a class="btn btn-outline-success btn-sm"
                            asp-action="DownloadAsset" asp-route-jobId="@ar.JobId" asp-route-fileName="@ar.CobolSkeletonFileName">
                             <i class="fas fa-download me-1"></i>COBOL (.cbl)
+                            @if (ar.CobolAiGenerated)
+                            {
+                                <span class="badge bg-warning text-dark ms-1" title="Generated by AI">AI</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary ms-1" title="Statically generated">Static</span>
+                            }
                         </a>
                     }
                     @if (ar.JclSkeletonFileName != null)
@@ -351,6 +405,14 @@
                         <a class="btn btn-outline-primary btn-sm"
                            asp-action="DownloadAsset" asp-route-jobId="@ar.JobId" asp-route-fileName="@ar.JclSkeletonFileName">
                             <i class="fas fa-download me-1"></i>JCL (.jcl)
+                            @if (ar.JclAiGenerated)
+                            {
+                                <span class="badge bg-warning text-dark ms-1" title="Generated by AI">AI</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary ms-1" title="Statically generated">Static</span>
+                            }
                         </a>
                     }
                     @if (ar.TechnicalSpecFileName != null)
@@ -594,6 +656,267 @@
                 </div>
             </div>
 
+        </div>
+    </div>
+
+    @* ══════════════════════════════════════════════════════════════════════════
+       TAB 4 — RECON PROGRAM (COBOL + JCL reconciliation verification program)
+       ══════════════════════════════════════════════════════════════════════════ *@
+    <div class="tab-pane fade @(activeTab == "tab-recon" ? "show active" : "")"
+         id="tab-recon" role="tabpanel">
+        <div class="p-4">
+            <div class="row g-4">
+
+                @* Left: description *@
+                <div class="col-lg-3">
+                    <h6 class="text-danger fw-semibold mb-2"><i class="fas fa-info-circle me-1"></i>What it generates</h6>
+                    <ul class="list-unstyled small text-muted mb-3">
+                        <li class="mb-1"><i class="fas fa-file-code text-danger me-2"></i>COBOL verification program <code>.cbl</code></li>
+                        <li class="mb-1"><i class="fas fa-file-lines text-secondary me-2"></i>JCL to run it on the mainframe <code>.jcl</code></li>
+                        <li class="mb-1"><i class="fas fa-file-alt text-muted me-2"></i>Developer specification <code>.txt</code></li>
+                    </ul>
+                    <p class="small text-muted mb-2">
+                        <i class="fas fa-gears me-1"></i><strong>Deterministic.</strong>
+                        Reads <code>reconciliation_config.json</code> and <code>reconciliation_result.json</code>.
+                        No AI involved.
+                    </p>
+                    <div class="alert alert-warning py-2 px-3 small mb-0">
+                        <i class="fas fa-triangle-exclamation me-1"></i>
+                        <strong>Developer review required.</strong> Update DD dataset names in the JCL before submitting.
+                    </div>
+                </div>
+
+                @* Right: form *@
+                <div class="col-lg-9">
+                    <form asp-action="GenerateReconProgram" method="post">
+                        @Html.AntiForgeryToken()
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Job ID</label>
+                                <input name="JobId" value="@reconModel.JobId"
+                                       class="form-control job-id-input"
+                                       placeholder="JOB_20260701023607_0DCBE8" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">
+                                    Program Name
+                                    <span class="text-muted fw-normal small">(max 8 chars)</span>
+                                </label>
+                                <input name="Request.ProgramName"
+                                       value="@reconModel.Request.ProgramName"
+                                       class="form-control text-uppercase"
+                                       maxlength="8" placeholder="RECONPGM" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">
+                                    Job Name
+                                    <span class="text-muted fw-normal small">(max 8 chars)</span>
+                                </label>
+                                <input name="Request.JobName"
+                                       value="@reconModel.Request.JobName"
+                                       class="form-control text-uppercase"
+                                       maxlength="8" placeholder="RECONJOB" />
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-auto">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox"
+                                           name="Request.GenerateCobol" value="true"
+                                           id="chkReconCobol"
+                                           @(reconModel.Request.GenerateCobol ? "checked" : "") />
+                                    <input type="hidden" name="Request.GenerateCobol" value="false" />
+                                    <label class="form-check-label small" for="chkReconCobol">
+                                        <i class="fas fa-file-code text-danger me-1"></i>COBOL Program
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox"
+                                           name="Request.GenerateJcl" value="true"
+                                           id="chkReconJcl"
+                                           @(reconModel.Request.GenerateJcl ? "checked" : "") />
+                                    <input type="hidden" name="Request.GenerateJcl" value="false" />
+                                    <label class="form-check-label small" for="chkReconJcl">
+                                        <i class="fas fa-file-lines text-secondary me-1"></i>JCL
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox"
+                                           name="Request.GenerateSpec" value="true"
+                                           id="chkReconSpec"
+                                           @(reconModel.Request.GenerateSpec ? "checked" : "") />
+                                    <input type="hidden" name="Request.GenerateSpec" value="false" />
+                                    <label class="form-check-label small" for="chkReconSpec">
+                                        <i class="fas fa-file-alt text-muted me-1"></i>Specification
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center gap-3 mt-3 mb-2">
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" role="switch"
+                                       name="Request.UseAiMode" value="true" id="chkReconAiMode" />
+                                <input type="hidden" name="Request.UseAiMode" value="false" />
+                                <label class="form-check-label fw-semibold" for="chkReconAiMode">
+                                    <i class="fas fa-robot text-warning me-1"></i>AI Mode
+                                    <span class="badge bg-warning text-dark ms-1" style="font-size:0.7rem;">COBOL &amp; JCL</span>
+                                </label>
+                            </div>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-scale-balanced me-1"></i>Generate Recon Program
+                            </button>
+                        </div>
+                    </form>
+
+                    @* Results *@
+                    @if (rr != null)
+                    {
+                        <hr class="my-4" />
+
+                        @* Summary cards *@
+                        <div class="row g-3 mb-4">
+                            <div class="col-sm-4">
+                                <div class="card border-0 bg-light text-center py-2">
+                                    <div class="fs-4 fw-bold text-danger">@rr.Checks.Count</div>
+                                    <div class="small text-muted">Recon Checks</div>
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <div class="card border-0 bg-light text-center py-2">
+                                    <div class="fs-4 fw-bold">@rr.TotalExpectedRecords</div>
+                                    <div class="small text-muted">Expected Records</div>
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <div class="card border-0 bg-light text-center py-2">
+                                    <div class="fs-4 fw-bold">@rr.TotalRecordLength</div>
+                                    <div class="small text-muted">LRECL (bytes)</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        @* AI/Static alert *@
+                        <div class="alert alert-warning py-2 mb-3 d-flex align-items-center gap-2">
+                            <i class="fas fa-triangle-exclamation flex-shrink-0"></i>
+                            @if (rr.CobolAiGenerated || rr.JclAiGenerated)
+                            {
+                                <span><strong>AI Mode was used.</strong> Review all generated code carefully — verify verification logic, update JCL dataset names, and test on a non-production environment before submitting to the mainframe.</span>
+                            }
+                            else
+                            {
+                                <span>Static generation was used — the expected values are embedded from <code>reconciliation_result.json</code>. Update JCL dataset names before submitting to the mainframe.</span>
+                            }
+                        </div>
+
+                        @* Download buttons *@
+                        <div class="d-flex flex-wrap gap-2 mb-4">
+                            @if (rr.CobolFileName != null)
+                            {
+                                <a href="@Url.Action("DownloadReconProgram", "Mainframe", new { jobId = rr.JobId, fileName = rr.CobolFileName })"
+                                   class="btn btn-outline-danger btn-sm">
+                                    <i class="fas fa-download me-1"></i>@rr.CobolFileName
+                                    @if (rr.CobolAiGenerated)
+                                    {
+                                        <span class="badge bg-warning text-dark ms-1" title="Generated by AI">AI</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary ms-1">Static</span>
+                                    }
+                                </a>
+                            }
+                            @if (rr.JclFileName != null)
+                            {
+                                <a href="@Url.Action("DownloadReconProgram", "Mainframe", new { jobId = rr.JobId, fileName = rr.JclFileName })"
+                                   class="btn btn-outline-secondary btn-sm">
+                                    <i class="fas fa-download me-1"></i>@rr.JclFileName
+                                    @if (rr.JclAiGenerated)
+                                    {
+                                        <span class="badge bg-warning text-dark ms-1" title="Generated by AI">AI</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary ms-1">Static</span>
+                                    }
+                                </a>
+                            }
+                            @if (rr.SpecFileName != null)
+                            {
+                                <a href="@Url.Action("DownloadReconProgram", "Mainframe", new { jobId = rr.JobId, fileName = rr.SpecFileName })"
+                                   class="btn btn-outline-dark btn-sm">
+                                    <i class="fas fa-download me-1"></i>@rr.SpecFileName
+                                </a>
+                            }
+                        </div>
+
+                        @* Checks table *@
+                        <h6 class="fw-semibold mb-2">
+                            <i class="fas fa-list-check me-1 text-danger"></i>Reconciliation Checks Embedded in COBOL
+                        </h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered table-hover align-middle">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Check</th>
+                                        <th>Type</th>
+                                        <th>Source Field</th>
+                                        <th>Expected Value</th>
+                                        <th>COBOL Variable</th>
+                                        <th>Position : Length</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="text-muted small">1</td>
+                                        <td><code class="small">RECORD-COUNT</code></td>
+                                        <td><span class="badge bg-secondary">COUNT</span></td>
+                                        <td class="text-muted small">(all records)</td>
+                                        <td class="small">@rr.TotalExpectedRecords</td>
+                                        <td><code class="small">WS-EXP-TOTAL-RECS</code></td>
+                                        <td class="text-muted small">—</td>
+                                    </tr>
+                                    @{ int chkIdx = 1; }
+                                    @foreach (var chk in rr.Checks)
+                                    {
+                                        chkIdx++;
+                                        <tr>
+                                            <td class="text-muted small">@chkIdx</td>
+                                            <td><code class="small">@chk.FieldName</code></td>
+                                            <td>
+                                                @if (chk.ReconType == "SUM")
+                                                {
+                                                    <span class="badge bg-danger">SUM</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">COUNT</span>
+                                                }
+                                            </td>
+                                            <td class="small text-muted">@(chk.SourceField ?? "—")</td>
+                                            <td class="small">@chk.ExpectedValue</td>
+                                            <td>
+                                                <code class="small">
+                                                    @(chk.ReconType == "SUM"
+                                                        ? $"WS-ACT-{chk.CobolVarName}"
+                                                        : $"WS-CNT-{chk.CobolVarName}")
+                                                </code>
+                                            </td>
+                                            <td class="text-muted small">@chk.StartPosition : @chk.Length</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
         </div>
     </div>
 

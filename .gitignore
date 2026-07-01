@@ -72,9 +72,14 @@ DataReconciliation/workflow/
 Thumbs.db
 desktop.ini
 
+# ChromaDB vector store (binary, runtime-generated, can be large)
+AISemanticMapping/data/chromadb/
+
 # ── Documents & scratch files ─────────────────────────────────────────────────
 *.docx
 *.pdf
 *.html
+*.xlsx
+~$*
 dotnet-install.ps1
 

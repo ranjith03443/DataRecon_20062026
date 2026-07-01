@@ -1,4 +1,6 @@
 using DataReconciliation.Domain.Enums;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 
 namespace DataReconciliation.Domain.Models
 {
@@ -152,6 +154,7 @@ namespace DataReconciliation.Domain.Models
         public string TransformationRule { get; set; } = string.Empty;
         public double Confidence { get; set; }
         public string Reasoning { get; set; } = string.Empty;
+        [JsonConverter(typeof(StringEnumConverter))]
         public ConfidenceLevel ConfidenceLevel { get; set; }
     }
 

@@ -11,6 +11,7 @@ The Mainframe Development Centre is a job-centric workspace for generating deter
 - Work from one shared workflow job ID across all tabs.
 - Generate mainframe artifacts directly from target schema data.
 - Produce COBOL and JCL starter assets for developer review.
+- Generate a COBOL reconciliation verification program that runs on the mainframe and mirrors the workflow's Step 13 reconciliation checks.
 - Run AI guidance for explanation, review, enhancement, validation, documentation, and optimization.
 
 ### User Interface Areas
@@ -82,7 +83,41 @@ This tab generates starter implementation assets that are useful for a developer
 - Produces starter code meant for developer review.
 - Displays a warning that COBOL and JCL are not production-ready.
 
-#### 3. AI Development Agent
+#### 3. Recon Program
+
+This tab generates a COBOL reconciliation verification program and matching JCL that run on the mainframe to independently verify the target file.
+
+**What it does**
+
+- Reads `reconciliation_config.json` to determine which fields to check and whether each check is a SUM or COUNT.
+- Reads expected values from `reconciliation_result.json` (produced by Step 13) and embeds them as COBOL literals.
+- Calculates fixed-width field positions from `target_metadata_profile.json` so that REFERENCE MODIFICATION extracts the correct bytes from each record.
+- Produces a COBOL program that reads the target `.dat` file and compares actual accumulated values against the embedded expected values.
+- Produces a JCL skeleton to compile and run the program.
+- Produces a developer specification document listing all checks, positions, and instructions.
+
+**Input fields**
+
+- `Job ID` — the workflow job (Steps 10–13 must be complete).
+- `Program Name` — COBOL program name, limited to 8 characters.
+- `Job Name` — JCL job name, limited to 8 characters.
+- Output checkboxes — select which of COBOL, JCL, and specification to generate.
+
+**Outputs**
+
+- COBOL program download (`.cbl`).
+- JCL skeleton download (`.jcl`).
+- Developer specification download (`.txt`).
+- Checks table showing each reconciliation check, its type (SUM/COUNT), source field, expected value, COBOL variable, and position:length.
+
+**Behavior**
+
+- Fully deterministic — no AI is involved.
+- Uses the same field-width logic as `TargetFileGenerationService` to ensure REFERENCE MODIFICATION positions match the actual `.dat` file layout.
+- Displays a warning that JCL DD dataset names must be updated before mainframe submission.
+- Output written to `{job-folder}/reports/mainframe-recon/`.
+
+#### 4. AI Development Agent
 
 This tab provides AI-assisted guidance for mainframe development tasks.
 
@@ -118,19 +153,20 @@ This tab provides AI-assisted guidance for mainframe development tasks.
 
 ### Shared Job Context
 
-The page uses one shared job ID across the three tabs.
+The page uses one shared job ID across all four tabs.
 
 - Entering the job ID in one tab updates the other tabs.
 - The active job banner shows the current job context.
-- The same job ID is used for artifact generation, asset generation, and AI analysis.
+- The same job ID is used for artifact generation, asset generation, recon program generation, and AI analysis.
 
 ### Typical Usage Flow
 
-1. Enter or select a workflow job ID.
-2. Generate the mainframe artifacts from the target schema.
-3. Generate starter assets if COBOL or JCL output is needed.
-4. Run an AI action such as explain, review, or documentation.
-5. Download the generated files and review the AI guidance.
+1. Enter or select a workflow job ID (Steps 10–13 must be complete for full functionality).
+2. Generate the mainframe artifacts from the target schema (Tab 1).
+3. Generate starter assets if a COBOL load skeleton or JCL is needed (Tab 2).
+4. Generate the Recon Program to produce the mainframe-side COBOL reconciliation verifier (Tab 3).
+5. Run an AI action such as explain, review, or documentation (Tab 4).
+6. Download the generated files, update JCL DD dataset names, and complete developer validation.
 
 ### Availability Notes
 
@@ -366,12 +402,12 @@ transformation_output ──►  Step 13  ──►  reconciliation_result.json
 | Attribute | Detail |
 |---|---|
 | **Service** | `ReconciliationService` |
-| **Input** | `canonical_records.json` (source truth) + `transformation_output.json` + `target_metadata_profile.json` |
-| **Processing** | Row count check; per-field validation against format/datatype/required/pattern rules; identifies mismatches with reason (null violation, pattern mismatch, length overflow) |
+| **Input** | `canonical_records.json` (source truth) + `transformation_output.json` + `target_metadata_profile.json` + `reconciliation_config.json` (user-configured fields, optional) |
+| **Processing** | Row count check. If `reconciliation_config.json` exists, uses the user-configured fields: SUM fields accumulate decimal totals from source and target rows; COUNT fields count distinct non-blank values. Falls back to auto-detection of financial and key fields. Identifies mismatches with reasons (null violation, pattern mismatch, length overflow, sum or count discrepancy). |
 | **AI Call** | ❌ None |
 | **AI Input** | — |
 | **AI Output** | — |
-| **Output Artifact** | `reconciliation_result.json` — `{ TotalSourceRecords, TotalTargetRecords, MatchedCount, MismatchCount, SuccessRate%, Mismatches[], ValidationErrors[] }` |
+| **Output Artifact** | `reconciliation_result.json` — `{ TotalSourceRecords, TotalTargetRecords, MatchedRecords, FieldTotals, SourceFieldTotals, SourceFieldCounts, TargetFieldCounts, Mismatches[], ValidationErrors[] }`. These values are the source of truth used by the Recon Program generator in the Mainframe Development Centre. |
 
 #### Step 14 — ReportingAuditGeneration
 

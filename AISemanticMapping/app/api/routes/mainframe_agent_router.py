@@ -1,14 +1,18 @@
 """
 Router for /api/mainframe/* — Mainframe Development AI Agent endpoints.
 
-POST /api/mainframe/explain          — COBOL Explain Agent
-POST /api/mainframe/review           — COBOL Review Agent
-POST /api/mainframe/enhance          — COBOL Enhancement Agent
-POST /api/mainframe/validation       — Validation Logic Agent
-POST /api/mainframe/error-handling   — Error Handling Agent
-POST /api/mainframe/documentation    — Developer Documentation Agent
-POST /api/mainframe/jcl-improvements — JCL Improvement Agent
-POST /api/mainframe/optimization     — Optimisation Agent
+POST /api/mainframe/explain               — COBOL Explain Agent
+POST /api/mainframe/review                — COBOL Review Agent
+POST /api/mainframe/enhance               — COBOL Enhancement Agent
+POST /api/mainframe/validation            — Validation Logic Agent
+POST /api/mainframe/error-handling        — Error Handling Agent
+POST /api/mainframe/documentation         — Developer Documentation Agent
+POST /api/mainframe/jcl-improvements      — JCL Improvement Agent
+POST /api/mainframe/optimization          — Optimisation Agent
+POST /api/mainframe/generate-cobol        — AI COBOL Program Generation (AI Mode)
+POST /api/mainframe/generate-jcl          — AI JCL Generation (AI Mode)
+POST /api/mainframe/generate-recon-cobol  — AI Recon COBOL Verification Program (AI Mode)
+POST /api/mainframe/generate-recon-jcl    — AI Recon JCL Generation (AI Mode)
 """
 from fastapi import APIRouter, Depends, Request
 from loguru import logger
@@ -35,10 +39,9 @@ def _get_service() -> MainframeAgentService:
 
 def _log(request: Request, prompt_type: str, body: MainframeAgentRequestDTO) -> None:
     rid = getattr(request.state, "request_id", None)
-    logger.info(
+    logger.bind(category=LogCategories.MAINFRAME_AI_AGENT).info(
         f"[MainframeAgentRouter] POST /mainframe/{prompt_type} | "
-        f"jobId={body.jobId} | request_id={rid}",
-        category=LogCategories.MAINFRAME_AI_AGENT,
+        f"jobId={body.jobId} | request_id={rid}"
     )
 
 
@@ -201,4 +204,88 @@ async def generate_optimization(
 ) -> MainframeAgentResponseDTO:
     _log(request, "optimization", body)
     body.promptType = "optimization"
+    return await service.run_agent(body, request_id=getattr(request.state, "request_id", None))
+
+
+@router.post(
+    "/generate-cobol",
+    response_model=MainframeAgentResponseDTO,
+    summary="Generate a complete AI COBOL transformation program (AI Mode)",
+    description=(
+        "Generates a complete, working IBM COBOL transformation program from the job's "
+        "field mappings, transformation rules, target layout, and value mappings. "
+        "Not a skeleton — actual transformation logic per field. "
+        "AI Generated — Developer Review Required."
+    ),
+)
+async def generate_cobol_program(
+    request: Request,
+    body: MainframeAgentRequestDTO,
+    service: MainframeAgentService = Depends(_get_service),
+) -> MainframeAgentResponseDTO:
+    _log(request, "generate-cobol", body)
+    body.promptType = "generate_cobol"
+    return await service.run_agent(body, request_id=getattr(request.state, "request_id", None))
+
+
+@router.post(
+    "/generate-jcl",
+    response_model=MainframeAgentResponseDTO,
+    summary="Generate a complete AI JCL job (compile + execute) (AI Mode)",
+    description=(
+        "Generates a complete JCL job with compile (IGYCRCTL), link-edit (HEWL), "
+        "and execute steps for the COBOL transformation program. "
+        "Includes all DD cards with correct LRECL and RECFM. "
+        "AI Generated — Developer Review Required."
+    ),
+)
+async def generate_jcl_program(
+    request: Request,
+    body: MainframeAgentRequestDTO,
+    service: MainframeAgentService = Depends(_get_service),
+) -> MainframeAgentResponseDTO:
+    _log(request, "generate-jcl", body)
+    body.promptType = "generate_jcl"
+    return await service.run_agent(body, request_id=getattr(request.state, "request_id", None))
+
+
+@router.post(
+    "/generate-recon-cobol",
+    response_model=MainframeAgentResponseDTO,
+    summary="Generate a complete AI COBOL reconciliation verification program (AI Mode)",
+    description=(
+        "Generates a complete COBOL verification program that reads the target fixed-width "
+        "file and independently verifies record counts and field totals against embedded "
+        "expected values from reconciliation_result.json. "
+        "AI Generated — Developer Review Required."
+    ),
+)
+async def generate_recon_cobol_program(
+    request: Request,
+    body: MainframeAgentRequestDTO,
+    service: MainframeAgentService = Depends(_get_service),
+) -> MainframeAgentResponseDTO:
+    _log(request, "generate-recon-cobol", body)
+    body.promptType = "generate_recon_cobol"
+    return await service.run_agent(body, request_id=getattr(request.state, "request_id", None))
+
+
+@router.post(
+    "/generate-recon-jcl",
+    response_model=MainframeAgentResponseDTO,
+    summary="Generate a complete AI JCL job for the reconciliation verification program (AI Mode)",
+    description=(
+        "Generates a complete JCL job (compile + link-edit + execute) for the COBOL "
+        "reconciliation verification program. Includes correct LRECL for the target "
+        "file and RPTFILE (132-byte report). "
+        "AI Generated — Developer Review Required."
+    ),
+)
+async def generate_recon_jcl_program(
+    request: Request,
+    body: MainframeAgentRequestDTO,
+    service: MainframeAgentService = Depends(_get_service),
+) -> MainframeAgentResponseDTO:
+    _log(request, "generate-recon-jcl", body)
+    body.promptType = "generate_recon_jcl"
     return await service.run_agent(body, request_id=getattr(request.state, "request_id", None))

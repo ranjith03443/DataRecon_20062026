@@ -10,6 +10,7 @@ namespace DataReconciliation.Controllers
         private readonly IMainframeArtifactGenerationService _generator;
         private readonly IMainframeAssetGenerationService _assetGenerator;
         private readonly IMainframeAiAgentService _aiAgent;
+        private readonly IReconProgramGenerationService _reconGenerator;
         private readonly IArtifactPersistenceService _artifactPersistence;
         private readonly ILogger<MainframeController> _logger;
 
@@ -17,12 +18,14 @@ namespace DataReconciliation.Controllers
             IMainframeArtifactGenerationService generator,
             IMainframeAssetGenerationService assetGenerator,
             IMainframeAiAgentService aiAgent,
+            IReconProgramGenerationService reconGenerator,
             IArtifactPersistenceService artifactPersistence,
             ILogger<MainframeController> logger)
         {
             _generator = generator;
             _assetGenerator = assetGenerator;
             _aiAgent = aiAgent;
+            _reconGenerator = reconGenerator;
             _artifactPersistence = artifactPersistence;
             _logger = logger;
         }
@@ -252,18 +255,82 @@ namespace DataReconciliation.Controllers
             }
         }
 
+        // ── Recon Program Generation ──────────────────────────────────────────
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> GenerateReconProgram(ReconProgramPageDto model)
+        {
+            if (string.IsNullOrWhiteSpace(model.JobId))
+                ModelState.AddModelError(nameof(model.JobId), "Please enter a workflow job id.");
+
+            if (!ModelState.IsValid)
+                return View("Index", BuildCombinedReconPage(model));
+
+            try
+            {
+                model.Result = await _reconGenerator.GenerateAsync(model.JobId.Trim(), model.Request);
+                TempData["ReconSuccess"] = "Recon program generated successfully.";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Recon program generation failed. JobId={JobId}", model.JobId);
+                TempData["ReconError"] = ex.Message;
+            }
+
+            return View("Index", BuildCombinedReconPage(model));
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> DownloadReconProgram(string jobId, string fileName)
+        {
+            if (string.IsNullOrWhiteSpace(jobId) || string.IsNullOrWhiteSpace(fileName))
+            {
+                Response.StatusCode = StatusCodes.Status400BadRequest;
+                return Content("Recon program download failed: job id and file name are required.", "text/plain");
+            }
+
+            try
+            {
+                var filePath = await _reconGenerator.ResolveProgramPathAsync(jobId.Trim(), fileName.Trim());
+                if (filePath == null)
+                {
+                    _logger.LogWarning("Recon program download requested for missing file. JobId={JobId} FileName={FileName}", jobId, fileName);
+                    Response.StatusCode = StatusCodes.Status404NotFound;
+                    return Content($"Recon program file not found for job '{jobId}'. Please regenerate and try again.", "text/plain");
+                }
+
+                var contentType = fileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
+                    ? "application/json"
+                    : "text/plain";
+
+                return PhysicalFile(filePath, contentType, Path.GetFileName(filePath));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Recon program download failed. JobId={JobId} FileName={FileName}", jobId, fileName);
+                Response.StatusCode = StatusCodes.Status500InternalServerError;
+                return Content("Recon program download failed due to an internal error.", "text/plain");
+            }
+        }
+
         // ── Helpers ───────────────────────────────────────────────────────────
 
-        /// <summary>
-        /// Combines the artifact page model into the unified Index view model.
-        /// Preserves any existing artifact Result already in TempData/ViewData.
-        /// </summary>
         private static MainframeArtifactPageDto BuildCombinedPage(MainframeAssetPageDto assetModel)
         {
             return new MainframeArtifactPageDto
             {
                 JobId = assetModel.JobId,
                 AssetPageModel = assetModel
+            };
+        }
+
+        private static MainframeArtifactPageDto BuildCombinedReconPage(ReconProgramPageDto reconModel)
+        {
+            return new MainframeArtifactPageDto
+            {
+                JobId = reconModel.JobId,
+                ReconPageModel = reconModel
             };
         }
     }

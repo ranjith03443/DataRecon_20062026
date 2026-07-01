@@ -49,6 +49,10 @@ namespace DataReconciliation.AI.Clients
                 { "documentation",    "/api/mainframe/documentation"    },
                 { "jcl_improvements", "/api/mainframe/jcl-improvements" },
                 { "optimization",     "/api/mainframe/optimization"     },
+                { "generate_cobol",        "/api/mainframe/generate-cobol"        },
+                { "generate_jcl",          "/api/mainframe/generate-jcl"          },
+                { "generate_recon_cobol",  "/api/mainframe/generate-recon-cobol"  },
+                { "generate_recon_jcl",    "/api/mainframe/generate-recon-jcl"    },
             };
 
         public PythonMainframeAiAgentService(
@@ -88,17 +92,25 @@ namespace DataReconciliation.AI.Clients
             // ── Build payload ─────────────────────────────────────────────────
             var payload = new
             {
-                jobId           = request.JobId,
-                promptType      = request.PromptType,
-                cobolContent    = request.CobolContent,
-                jclContent      = request.JclContent,
-                copybookContent = request.CopybookContent,
+                jobId             = request.JobId,
+                promptType        = request.PromptType,
+                cobolContent      = request.CobolContent,
+                jclContent        = request.JclContent,
+                copybookContent   = request.CopybookContent,
                 transformationRules = request.TransformationRules,
-                valueMappings   = request.ValueMappings,
-                fieldMappings   = request.FieldMappings,
-                targetSchema    = request.TargetSchema,
-                requestId       = request.RequestId,
-                userId          = request.UserId,
+                valueMappings     = request.ValueMappings,
+                fieldMappings     = request.FieldMappings,
+                targetSchema      = request.TargetSchema,
+                programName         = request.ProgramName,
+                recordName          = request.RecordName,
+                jobName             = request.JobName,
+                totalRecordLength   = request.TotalRecordLength,
+                fieldDetails        = request.FieldDetails,
+                sourceDatasets      = request.SourceDatasets,
+                expectedRecordCount = request.ExpectedRecordCount,
+                reconChecks         = request.ReconChecks,
+                requestId           = request.RequestId,
+                userId              = request.UserId,
             };
 
             var baseUrl  = _configuration["AI:PythonService:BaseUrl"] ?? "http://localhost:8000";

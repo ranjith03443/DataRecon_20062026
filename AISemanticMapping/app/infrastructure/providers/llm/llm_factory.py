@@ -38,8 +38,9 @@ class LLMProviderFactory:
             ConfigurationException: If provider is unknown or not configured.
         """
         config = get_app_config()
-        provider_name = (provider_override or config.llm_provider).lower()
         model_config = config.get_model_config(task or "semantic_mapping") if task else {}
+        task_provider = model_config.get("provider") if model_config else None
+        provider_name = (provider_override or task_provider or config.llm_provider).lower()
 
         logger.info(
             f"[LLMProviderFactory] Creating provider | provider={provider_name} | task={task}",

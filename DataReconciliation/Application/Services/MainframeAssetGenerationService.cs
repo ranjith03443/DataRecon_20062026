@@ -24,15 +24,18 @@ namespace DataReconciliation.Application.Services
         private readonly ILogger<MainframeAssetGenerationService> _logger;
         private readonly IArtifactPersistenceService _artifactPersistence;
         private readonly IFileIngestionService _fileIngestionService;
+        private readonly IMainframeAiAgentService _aiAgent;
 
         public MainframeAssetGenerationService(
             ILogger<MainframeAssetGenerationService> logger,
             IArtifactPersistenceService artifactPersistence,
-            IFileIngestionService fileIngestionService)
+            IFileIngestionService fileIngestionService,
+            IMainframeAiAgentService aiAgent)
         {
             _logger = logger;
             _artifactPersistence = artifactPersistence;
             _fileIngestionService = fileIngestionService;
+            _aiAgent = aiAgent;
         }
 
         // ─── Public Entry Point ───────────────────────────────────────────────
@@ -131,23 +134,67 @@ namespace DataReconciliation.Application.Services
             if (request.GenerateCobolSkeleton)
             {
                 var fn = $"{safePgm.ToLowerInvariant()}_transform_{ts}.cbl";
-                await File.WriteAllTextAsync(
-                    Path.Combine(outputFolder, fn),
-                    BuildCobolSkeleton(safeRecord, safeApp, safePgm, fields, valueMappings),
-                    Encoding.UTF8);
+                string cobolContent;
+                if (request.UseAiMode)
+                {
+                    _logger.LogInformation("AI Mode: generating COBOL program. JobId={JobId}", jobId);
+                    var aiRequest = BuildAiRequest(
+                        jobId, "generate_cobol", safePgm, safeRecord, safeJob,
+                        position - 1, fields, finalMapping, valueMappings);
+                    var aiResult = await _aiAgent.RunAgentAsync(aiRequest);
+                    if (aiResult == null || string.IsNullOrWhiteSpace(aiResult.GeneratedCode))
+                        throw new InvalidOperationException(
+                            "AI service did not return a COBOL program. " +
+                            "Please ensure the Python AI service is running, then try again. " +
+                            "Alternatively, switch AI Mode off to use static generation.");
+                    cobolContent = aiResult.GeneratedCode;
+                    result.CobolAiGenerated = true;
+                    _logger.LogInformation(
+                        "AI COBOL program received. JobId={JobId} Confidence={Confidence}",
+                        jobId, aiResult.Confidence);
+                }
+                else
+                {
+                    cobolContent = BuildCobolSkeleton(safeRecord, safeApp, safePgm, fields, valueMappings);
+                }
+                await File.WriteAllTextAsync(Path.Combine(outputFolder, fn), cobolContent, Encoding.UTF8);
                 result.CobolSkeletonFileName = fn;
-                _logger.LogInformation("COBOL skeleton written. JobId={JobId} File={File}", jobId, fn);
+                _logger.LogInformation(
+                    "COBOL written. JobId={JobId} File={File} AiMode={AiMode}",
+                    jobId, fn, request.UseAiMode);
             }
 
             if (request.GenerateJclSkeleton)
             {
                 var fn = $"{safeJob.ToLowerInvariant()}_load_{ts}.jcl";
-                await File.WriteAllTextAsync(
-                    Path.Combine(outputFolder, fn),
-                    BuildJcl(safeJob, safePgm, safeRecord, position - 1),
-                    Encoding.UTF8);
+                string jclContent;
+                if (request.UseAiMode)
+                {
+                    _logger.LogInformation("AI Mode: generating JCL. JobId={JobId}", jobId);
+                    var aiRequest = BuildAiRequest(
+                        jobId, "generate_jcl", safePgm, safeRecord, safeJob,
+                        position - 1, fields, finalMapping, valueMappings);
+                    var aiResult = await _aiAgent.RunAgentAsync(aiRequest);
+                    if (aiResult == null || string.IsNullOrWhiteSpace(aiResult.GeneratedCode))
+                        throw new InvalidOperationException(
+                            "AI service did not return JCL. " +
+                            "Please ensure the Python AI service is running, then try again. " +
+                            "Alternatively, switch AI Mode off to use static generation.");
+                    jclContent = aiResult.GeneratedCode;
+                    result.JclAiGenerated = true;
+                    _logger.LogInformation(
+                        "AI JCL received. JobId={JobId} Confidence={Confidence}",
+                        jobId, aiResult.Confidence);
+                }
+                else
+                {
+                    jclContent = BuildJcl(safeJob, safePgm, safeRecord, position - 1);
+                }
+                await File.WriteAllTextAsync(Path.Combine(outputFolder, fn), jclContent, Encoding.UTF8);
                 result.JclSkeletonFileName = fn;
-                _logger.LogInformation("JCL skeleton written. JobId={JobId} File={File}", jobId, fn);
+                _logger.LogInformation(
+                    "JCL written. JobId={JobId} File={File} AiMode={AiMode}",
+                    jobId, fn, request.UseAiMode);
             }
 
             if (request.GenerateTechnicalSpec)
@@ -196,6 +243,91 @@ namespace DataReconciliation.Application.Services
         {
             var reportsPath = await _fileIngestionService.GetWorkflowPathAsync(jobId, "reports");
             return Path.GetFullPath(Path.Combine(reportsPath, "mainframe-assets"));
+        }
+
+        // ─── AI Request Builder ───────────────────────────────────────────────
+
+        private static MainframeAiAgentRequest BuildAiRequest(
+            string jobId,
+            string promptType,
+            string programName,
+            string recordName,
+            string jobName,
+            int totalRecordLength,
+            IReadOnlyList<MainframeAssetFieldDto> fields,
+            FinalMappingConfig? finalMapping,
+            ValueMappingsDocument? valueMappings)
+        {
+            var fieldDetails = fields.Select(f => new Dictionary<string, object?>
+            {
+                { "fieldName",      f.FieldName      },
+                { "cobolFieldName", f.CobolFieldName  },
+                { "dataType",       f.DataType        },
+                { "startPosition",  f.StartPosition   },
+                { "length",         f.Length          },
+                { "pictureClause",  f.PictureClause   },
+                { "sourceField",    f.SourceField     },
+                { "isRequired",     f.IsRequired      },
+                { "format",         f.Format          },
+                { "rule",           f.Rule            },
+            }).ToList();
+
+            var fieldMappings = finalMapping?.Mappings.Select(m => new Dictionary<string, object?>
+            {
+                { "targetField",     m.TargetField   },
+                { "sourceField",     m.SourceField   },
+                { "sourceDataset",   m.SourceDataset },
+                { "confidence",      m.Confidence    },
+                { "transformations", m.Transformations
+                    .Select(t => new Dictionary<string, object?>
+                    {
+                        { "operation",   t.Operation    },
+                        { "rules",       t.Rules        },
+                        { "format",      t.Format       },
+                        { "fixedWidth",  t.FixedWidth   },
+                        { "maskPattern", t.MaskPattern  },
+                    })
+                    .ToList<object?>() },
+            }).ToList();
+
+            // Distinct source datasets — tells the AI how many input files exist
+            // and which source fields belong to each one.
+            var sourceDatasets = finalMapping?.Mappings
+                .Where(m => !string.IsNullOrWhiteSpace(m.SourceDataset))
+                .GroupBy(m => m.SourceDataset!, StringComparer.OrdinalIgnoreCase)
+                .Select(g => new Dictionary<string, object?>
+                {
+                    { "datasetId",   g.Key },
+                    { "fields",      g.Select(m => m.SourceField).Distinct().ToList() },
+                    { "fieldCount",  g.Count() },
+                })
+                .ToList<Dictionary<string, object?>>();
+
+            Dictionary<string, object?>? vmDict = null;
+            if (valueMappings?.Fields?.Count > 0)
+            {
+                vmDict = valueMappings.Fields.ToDictionary(
+                    f => f.TargetField,
+                    f => (object?)f.Entries
+                        .Where(e => e.IsEnabled)
+                        .Select(e => new { e.SourceValue, e.TargetValue })
+                        .ToList());
+            }
+
+            return new MainframeAiAgentRequest
+            {
+                JobId             = jobId,
+                PromptType        = promptType,
+                ProgramName       = programName,
+                RecordName        = recordName,
+                JobName           = jobName,
+                TotalRecordLength = totalRecordLength,
+                FieldDetails      = fieldDetails,
+                FieldMappings     = fieldMappings,
+                ValueMappings     = vmDict,
+                SourceDatasets    = sourceDatasets,
+                RequestId         = Guid.NewGuid().ToString(),
+            };
         }
 
         // ─── COPYBOOK ─────────────────────────────────────────────────────────

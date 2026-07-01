@@ -21,7 +21,7 @@ from app.infrastructure.providers.llm.llm_factory import LLMProviderFactory
 from app.shared.constants.app_constants import LogCategories, WorkflowStepConstants
 from app.shared.exceptions.base_exceptions import RuleInferenceException
 from app.shared.utilities.hash_utils import build_cache_key
-from app.shared.utilities.sanitizer import sanitize_prompt
+from app.shared.utilities.sanitizer import sanitize_prompt, safe_exc
 
 _PROMPT_ID = "rule_inference_v1"
 
@@ -108,7 +108,7 @@ class RuleInferenceService:
                 )
             except Exception as exc:
                 logger.warning(
-                    f"[RuleInferenceService] RAG failed (continuing) | error={str(exc)[:100]}",
+                    f"[RuleInferenceService] RAG failed (continuing) | error={safe_exc(exc, 100)}",
                     category=LogCategories.RAG,
                 )
 

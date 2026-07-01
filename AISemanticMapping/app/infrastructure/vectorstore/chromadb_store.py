@@ -14,6 +14,7 @@ from app.infrastructure.config.config_loader import get_app_config
 from app.infrastructure.vectorstore.ivectorstore import IVectorStore, VectorSearchResult
 from app.shared.constants.app_constants import LogCategories
 from app.shared.exceptions.base_exceptions import VectorStoreException
+from app.shared.utilities.sanitizer import safe_exc
 
 
 class ChromaDBStore(IVectorStore):
@@ -40,7 +41,7 @@ class ChromaDBStore(IVectorStore):
             )
         except Exception as exc:
             logger.error(
-                f"[ChromaDBStore] Failed to initialize ChromaDB | error={str(exc)[:200]}",
+                f"[ChromaDBStore] Failed to initialize ChromaDB | error={safe_exc(exc)}",
                 category=LogCategories.VECTOR_STORE,
             )
             raise VectorStoreException(
@@ -108,7 +109,7 @@ class ChromaDBStore(IVectorStore):
         except Exception as exc:
             logger.error(
                 f"[ChromaDBStore] Indexing FAILED | collection={collection_name} | "
-                f"error={str(exc)[:200]}",
+                f"error={safe_exc(exc)}",
                 category=LogCategories.VECTOR_STORE,
             )
             raise VectorStoreException(
@@ -176,7 +177,7 @@ class ChromaDBStore(IVectorStore):
         except Exception as exc:
             logger.error(
                 f"[ChromaDBStore] Search FAILED | collection={collection_name} | "
-                f"error={str(exc)[:200]}",
+                f"error={safe_exc(exc)}",
                 category=LogCategories.VECTOR_STORE,
             )
             raise VectorStoreException(
@@ -227,7 +228,7 @@ class ChromaDBStore(IVectorStore):
             return True
         except Exception as exc:
             logger.error(
-                f"[ChromaDBStore] Health check FAILED: {str(exc)[:200]}",
+                f"[ChromaDBStore] Health check FAILED: {safe_exc(exc)}",
                 category=LogCategories.HEALTH,
             )
             return False

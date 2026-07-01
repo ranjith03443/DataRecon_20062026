@@ -557,47 +557,49 @@ else
                             </tr>
                         </thead>
                         <tbody>
-                            @{int txIdx = 0;}
+                            @{ int txIdx = 0; }
                             @foreach (var m in Model.Mappings)
                             {
                                 var visibleTx = m.Transformations
                                     .Where(t => !string.Equals(t.Operation, "HARDCODED_VALUE", StringComparison.OrdinalIgnoreCase))
                                     .ToList();
                                 if (!visibleTx.Any()) continue;
-                                foreach (var rule in visibleTx)
-                                {
-                                    txIdx++;
-                                    var operation = (rule.Operation ?? "").ToUpperInvariant();
-                                    var changeDescription = operation switch
-                                    {
-                                        "FIXED_WIDTH_FORMATTING"   => $"Pad/truncate to {rule.FixedWidth?.ToString() ?? "target width"} chars, {(rule.Alignment ?? "LEFT").ToUpperInvariant()} aligned, fill '{(string.IsNullOrEmpty(rule.PadCharacter) ? " " : rule.PadCharacter)}'",
-                                        "DATE_FORMATTING"          => $"Convert date → {(string.IsNullOrWhiteSpace(rule.Format) ? "target date format" : rule.Format)}",
-                                        "DECIMAL_FORMATTING"       => "Normalize decimal representation for target output",
-                                        "VALUE_MAPPING"            => $"Map source values using {(rule.Rules?.Count ?? 0)} rule(s)",
-                                        "MASKING"                  => string.IsNullOrWhiteSpace(rule.MaskPattern) ? "Mask sensitive value" : $"Mask value → {rule.MaskPattern}",
-                                        "DEFAULT_VALUE_ASSIGNMENT" => string.IsNullOrWhiteSpace(rule.DefaultValue) ? "Assign default when empty" : $"Default: '{rule.DefaultValue}'",
-                                        "DATATYPE_CONVERSION"      => "Convert value to target datatype",
-                                        "UPPERCASE"                => "Convert text → UPPERCASE",
-                                        "LOWERCASE"                => "Convert text → lowercase",
-                                        "TRIM"                     => "Trim leading/trailing spaces",
-                                        _ => rule.AIParameters != null && rule.AIParameters.Any()
-                                            ? "Apply AI-derived transformation"
-                                            : "Apply configured rule"
-                                    };
-                                    <tr>
-                                        <td class="text-muted small">@txIdx</td>
-                                        <td><code class="small">@m.TargetField</code></td>
-                                        <td class="text-muted small">@(m.SourceField ?? "—")</td>
-                                        <td>
-                                            <span class="badge bg-light text-dark border">@rule.Operation</span>
-                                            @if (rule.AIParameters != null && rule.AIParameters.Any())
+                                txIdx++;
+                                var operationNames = string.Join(", ", visibleTx.Select(t => t.Operation));
+                                var hasAI = visibleTx.Any(t => t.AIParameters != null && t.AIParameters.Any());
+                                <tr>
+                                    <td class="text-muted small">@txIdx</td>
+                                    <td><code class="small">@m.TargetField</code></td>
+                                    <td class="text-muted small">@(m.SourceField ?? "—")</td>
+                                    <td class="small">
+                                        @operationNames
+                                        @if (hasAI)
+                                        {
+                                            <span class="badge bg-warning text-dark ms-1"><i class="fas fa-robot me-1"></i>AI</span>
+                                        }
+                                    </td>
+                                    <td class="small text-muted">
+                                        @foreach (var rule in visibleTx)
+                                        {
+                                            var op = rule.Operation.ToUpperInvariant();
+                                            var changeDescription = op switch
                                             {
-                                                <span class="badge bg-warning text-dark ms-1"><i class="fas fa-robot me-1"></i>AI</span>
-                                            }
-                                        </td>
-                                        <td class="small text-muted">@changeDescription</td>
-                                    </tr>
-                                }
+                                                "FIXED_WIDTH_FORMATTING"   => $"Pad/truncate to {rule.FixedWidth?.ToString() ?? "target width"} chars, {(rule.Alignment ?? "LEFT").ToUpperInvariant()} aligned, fill '{(string.IsNullOrEmpty(rule.PadCharacter) ? " " : rule.PadCharacter)}'",
+                                                "DATE_FORMATTING"          => $"Convert date → {(string.IsNullOrWhiteSpace(rule.Format) ? "target date format" : rule.Format)}",
+                                                "DECIMAL_FORMATTING"       => "Normalize decimal representation for target output",
+                                                "VALUE_MAPPING"            => $"Map source values using {(rule.Rules?.Count ?? 0)} rule(s)",
+                                                "MASKING"                  => string.IsNullOrWhiteSpace(rule.MaskPattern) ? "Mask sensitive value" : $"Mask value → {rule.MaskPattern}",
+                                                "DEFAULT_VALUE_ASSIGNMENT" => string.IsNullOrWhiteSpace(rule.DefaultValue) ? "Assign default when empty" : $"Default: '{rule.DefaultValue}'",
+                                                "DATATYPE_CONVERSION"      => "Convert value to target datatype",
+                                                "UPPERCASE"                => "Convert text → UPPERCASE",
+                                                "LOWERCASE"                => "Convert text → lowercase",
+                                                "TRIM"                     => "Trim leading/trailing spaces",
+                                                _                          => rule.AIParameters != null && rule.AIParameters.Any() ? "Apply AI-derived transformation" : "Apply configured rule"
+                                            };
+                                            <div>@changeDescription</div>
+                                        }
+                                    </td>
+                                </tr>
                             }
                             @if (txIdx == 0)
                             {

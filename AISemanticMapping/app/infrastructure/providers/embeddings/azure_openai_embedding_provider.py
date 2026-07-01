@@ -16,6 +16,7 @@ from app.infrastructure.providers.embeddings.iembedding_provider import (
 )
 from app.shared.constants.app_constants import LogCategories
 from app.shared.exceptions.base_exceptions import EmbeddingException
+from app.shared.utilities.sanitizer import safe_exc
 
 _MAX_RETRIES = 3
 _RETRY_BACKOFF_SECONDS = [1.0, 2.0, 4.0]
@@ -156,7 +157,7 @@ class AzureOpenAIEmbeddingProvider(IEmbeddingProvider):
             return healthy
         except Exception as exc:
             logger.error(
-                f"[AzureOpenAIEmbeddingProvider] Health check FAILED: {str(exc)[:200]}",
+                f"[AzureOpenAIEmbeddingProvider] Health check FAILED: {safe_exc(exc)}",
                 category=LogCategories.HEALTH,
             )
             return False

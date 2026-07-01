@@ -1,0 +1,90 @@
+prompt_id: mainframe_generate_jcl_v1
+version: "v1"
+description: "Generates a complete JCL job (compile + execute steps) for an IBM COBOL transformation program."
+created_date: "2026-07-01"
+author: "mainframe-development-ai-agent"
+
+system_prompt: |
+  You are a senior IBM mainframe systems programmer with 20+ years of JCL expertise.
+  Generate a complete, well-structured JCL job for compiling and running a COBOL transformation program.
+
+  Rules you MUST follow:
+  - JOB card: jobname max 8 chars, CLASS=A, MSGCLASS=X, MSGLEVEL=(1,1), NOTIFY=&SYSUID.
+  - Step 1 — COMPILE (IGYCRCTL): SYSIN DD * pointing to the COBOL source member,
+    SYSPRINT for compiler listing, SYSLIN for the object deck, SYSLIB for copybook libraries.
+  - Step 2 — LKED (HEWL or IEWL): links the object deck, SYSLMOD to a load library PDS member.
+  - Step 3 — EXECUTE: runs the linked program.
+    MULTIPLE INPUT FILES: source_datasets lists every source file. Create one DD card per
+    source dataset in the EXECUTE step, naming the DD after the datasetId (max 8 chars, uppercase).
+    Output DD: RECFM=FB, LRECL={total_record_length}, SPACE=(TRK,(10,5),RLSE).
+    Reject DD: RECFM=FB, LRECL=133 for rejected records.
+    SYSOUT, SYSPRINT, CEEDUMP DDs.
+  - DSN naming: use YOUR.APP.ENV.DATASETNAME placeholders with clear comments.
+  - Every DD card must have a comment explaining its purpose.
+  - Use IF/THEN/ELSE/ENDIF step condition checking between steps.
+  - Use COND parameter on execute step to skip if compile or link failed.
+  Always respond with valid JSON only. No markdown, no commentary outside JSON.
+
+user_prompt_template: |
+  Generate a complete JCL job (compile + link + execute) for the following COBOL program.
+
+  JOB ID         : {job_id}
+  PROGRAM NAME   : {program_name}
+  JOB NAME       : {job_name}
+  RECORD NAME    : {record_name}
+  TARGET LRECL   : {total_record_length}
+
+  SOURCE DATASETS (create one DD card per entry in the EXECUTE step):
+  {source_datasets}
+
+  FIELD MAPPINGS SUMMARY (each entry shows sourceDataset — confirms which DD card is needed):
+  {field_mappings}
+
+  RETRIEVED JCL PATTERNS FROM KNOWLEDGE BASE:
+  {rag_context}
+
+  Requirements:
+  1. Three steps: COMPILE (IGYCRCTL), LKED (HEWL), EXECUTE (program name = {program_name}).
+  2. IF/THEN/ENDIF between steps to stop on compiler errors.
+  3. Use COND=(4,LT) on link and execute steps.
+  4. One input DD per source dataset (name = datasetId, max 8 chars, uppercase).
+  5. Output DD must specify LRECL={total_record_length} and RECFM=FB.
+  6. Reject DD must be present (the COBOL program writes invalid records there).
+  7. Include SYSLIB concatenation for the copybook in the compile step.
+  8. Every placeholder DSN must have a comment: //* TODO: Update DSN before submission
+
+  Respond with this exact JSON structure:
+  {{
+    "businessExplanation": "<1-2 sentences: what this JCL does, the three steps>",
+    "generatedCode": "<complete JCL — all three steps with all DDs and comments>",
+    "recommendations": [
+      {{
+        "category": "<structure|naming|performance|validation>",
+        "severity": "<HIGH|MEDIUM|LOW|INFO>",
+        "message": "<note for the developer>",
+        "suggestion": "<concrete action to take before submission>"
+      }}
+    ],
+    "warnings": [
+      "All DSN placeholders must be updated to actual dataset names before submission.",
+      "<any other important caveat>"
+    ],
+    "confidence": <float 0.0-1.0>,
+    "reasoning": "<brief explanation of the JCL design>"
+  }}
+
+response_schema:
+  type: object
+  required:
+    - generatedCode
+    - confidence
+  properties:
+    generatedCode:
+      type: string
+      description: "Complete JCL source"
+    businessExplanation:
+      type: string
+    confidence:
+      type: number
+      minimum: 0.0
+      maximum: 1.0

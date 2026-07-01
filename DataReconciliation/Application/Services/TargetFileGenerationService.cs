@@ -43,7 +43,14 @@ namespace DataReconciliation.Application.Services
             var orderedFields = targetProfile.Fields.OrderBy(f => f.ColumnOrder).ToList();
 
             // Calculate total record width for fixed-width format
-            var totalWidth = orderedFields.Sum(f => f.FieldLength ?? 10);
+            var totalWidth = orderedFields.Sum(f =>
+            {
+                var isText = f.Datatype?.IndexOf("STRING", StringComparison.OrdinalIgnoreCase) >= 0
+                             || f.Datatype?.IndexOf("VARCHAR", StringComparison.OrdinalIgnoreCase) >= 0
+                             || f.Datatype?.IndexOf("CHAR", StringComparison.OrdinalIgnoreCase) >= 0
+                             || f.Datatype?.IndexOf("TEXT", StringComparison.OrdinalIgnoreCase) >= 0;
+                return f.FieldLength ?? (isText ? 30 : 10);
+            });
             _logger.LogInformation("Target file format. JobId={JobId} FieldCount={Fields} TotalWidth={Width} Mode={Mode}",
                 jobId, orderedFields.Count, totalWidth, _fileFormat);
 
@@ -96,7 +103,11 @@ namespace DataReconciliation.Application.Services
             foreach (var field in fields)
             {
                 record.TryGetValue(field.FieldName, out var value);
-                var width = field.FieldLength ?? 10;
+                var isText = field.Datatype?.IndexOf("STRING", StringComparison.OrdinalIgnoreCase) >= 0
+                             || field.Datatype?.IndexOf("VARCHAR", StringComparison.OrdinalIgnoreCase) >= 0
+                             || field.Datatype?.IndexOf("CHAR", StringComparison.OrdinalIgnoreCase) >= 0
+                             || field.Datatype?.IndexOf("TEXT", StringComparison.OrdinalIgnoreCase) >= 0;
+                var width = field.FieldLength ?? (isText ? 30 : 10);
                 var padded = PadField(value ?? string.Empty, width, field.Datatype);
                 sb.Append(padded);
             }

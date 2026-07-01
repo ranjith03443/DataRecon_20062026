@@ -4,11 +4,12 @@
 
 The **Mainframe Development Centre** is a job-based workspace in the DataReconciliation application. It combines deterministic generation and AI-assisted guidance into one page.
 
-It provides three functional areas:
+It provides four functional areas:
 
-1. **Mainframe Artifacts**
-2. **Mainframe Assets**
-3. **AI Development Agent**
+1. **Mainframe Artifacts** — copybook, specification, summary manifest
+2. **Mainframe Assets** — COBOL skeleton, JCL skeleton, sample records
+3. **Recon Program** — COBOL reconciliation verification program and JCL
+4. **AI Development Agent** — explanation, review, enhancement, documentation
 
 ---
 
@@ -18,6 +19,7 @@ The Mainframe Development Centre is designed to:
 
 - Generate mainframe-ready artifacts from workflow job data.
 - Produce starter COBOL/JCL assets for implementation.
+- Generate a standalone COBOL reconciliation verification program that mirrors the workflow's reconciliation checks on the mainframe.
 - Provide AI-powered developer guidance for explanation, review, enhancement, and documentation.
 - Keep all operations aligned to a single **Job ID**.
 
@@ -25,7 +27,7 @@ The Mainframe Development Centre is designed to:
 
 ## 3. Shared Job Context
 
-All three tabs use a shared **Job ID**.
+All four tabs use a shared **Job ID**.
 
 ### 3.1 Behavior
 
@@ -35,7 +37,7 @@ All three tabs use a shared **Job ID**.
 
 ### 3.2 Why this matters
 
-This avoids cross-job confusion and ensures artifacts, assets, and AI analysis all reference the same workflow state.
+This avoids cross-job confusion and ensures artifacts, assets, recon programs, and AI analysis all reference the same workflow state.
 
 ---
 
@@ -76,6 +78,12 @@ After generation, the page shows:
 - Deterministic output: same input context produces same artifacts.
 - Suitable as baseline artifacts before writing production COBOL.
 
+### 4.5 Output Folder
+
+```
+{job-folder}/reports/mainframe/
+```
+
 ---
 
 ## 5. Tab 2 — Mainframe Assets
@@ -100,7 +108,7 @@ This tab generates implementation starter assets (still deterministic, but inten
 ### 5.2 What it Generates
 
 - **Copybook** (`.cpy`)
-- **COBOL skeleton** (`.cbl`)
+- **COBOL skeleton** (`.cbl`) — load/transform program that reads source and writes target
 - **JCL skeleton** (`.jcl`)
 - **Technical specification** (`.txt`)
 - **Sample records** (`.dat`)
@@ -122,17 +130,112 @@ After generation, the page shows:
 
 COBOL/JCL outputs are **starter skeletons** and require developer review before production use.
 
+### 5.5 Output Folder
+
+```
+{job-folder}/reports/mainframe-assets/
+```
+
 ---
 
-## 6. Tab 3 — AI Development Agent
+## 6. Tab 3 — Recon Program
+
+This tab generates a **COBOL reconciliation verification program** and its JCL. It is distinct from the Assets tab COBOL skeleton: rather than transforming data, it reads the already-generated target `.dat` file and independently verifies that counts and sums match the expected values computed by the workflow.
+
+### 6.1 Concept
+
+The workflow's `ReconciliationService` (Step 13) computes expected counts and sums from the source data and stores them in `reconciliation_result.json`. The Recon Program embeds those expected values as COBOL literals, reads the target `.dat` file on the mainframe, and compares:
+
+| Check | Type | Expected Source |
+|---|---|---|
+| Total record count | COUNT | `reconciliation_result.TotalTargetRecords` |
+| SUM fields (e.g., TOTALAMOUNT) | SUM | `reconciliation_result.FieldTotals[field]` |
+| COUNT fields (e.g., CUSTOMERNBR) | COUNT | `reconciliation_result.TargetFieldCounts[field]` |
+
+The fields and their types (SUM or COUNT) are read from `reconciliation_config.json`, which the user configures in the Mapping Workbench before running Step 13.
+
+### 6.2 Inputs Required
+
+| Artifact | Purpose |
+|---|---|
+| `reconciliation_config.json` | Which fields to check and whether each is SUM or COUNT |
+| `reconciliation_result.json` | Expected values (totals, counts, record count) to embed as COBOL literals |
+| `target_metadata_profile.json` | Fixed-width field positions and lengths for REFERENCE MODIFICATION |
+| `final_mapping_config.json` | Source field names shown in the spec and checks table |
+
+Steps 10 (MappingConsolidation), 12 (TargetFileGeneration), and 13 (Reconciliation) must have completed before generating a Recon Program.
+
+### 6.3 Form Inputs
+
+- **Job ID** (required)
+- **Program Name** (max 8 chars, default `RECONPGM`)
+- **Job Name** (max 8 chars, default `RECONJOB`)
+- Output toggles:
+  - Generate COBOL Program
+  - Generate JCL
+  - Generate Specification
+
+### 6.4 What it Generates
+
+**COBOL program** (`.cbl`) — marked DEVELOPER REVIEW REQUIRED:
+- FILE SECTION with `FD TARGET-FILE RECFM=FB LRECL={totalRecordLength}` and `FD REPT-FILE`
+- WORKING-STORAGE with:
+  - Expected value literals from `reconciliation_result.json`
+  - Accumulators for SUM fields (`PIC 9(15)V99 COMP-3`)
+  - Counters for COUNT fields (`PIC 9(9) COMP-3`)
+  - Field extract buffers using REFERENCE MODIFICATION positions from the target profile
+- PROCEDURE DIVISION:
+  - `0000-MAIN` → open files → loop → terminate
+  - `1000-INIT` → open and read first record
+  - `2000-PROCESS` → extract fields via reference modification, accumulate SUM fields with `FUNCTION NUMVAL`, count non-blank for COUNT fields
+  - `9100-CHK-RECS` through `91xx-CHK-{field}` → one PASS/FAIL paragraph per check
+  - `9900-WRITE-SUMMARY` → overall PASS/FAIL with totals
+
+**JCL** (`.jcl`) — skeleton:
+- Runs the COBOL program
+- `TARGET` DD pointing to the target `.dat` file (`RECFM=FB LRECL={totalRecordLength}`)
+- `RPTFILE` DD for the output reconciliation report
+- Comments instructing developer to fill in dataset names
+
+**Specification** (`.txt`):
+- Purpose, target file layout, and LRECL
+- Full checks table: check number, field, type, source field, expected value
+- Field extraction table: COBOL variable, start position, length, PIC clause
+- Step-by-step developer instructions (compile, update JCL, submit, read report)
+
+### 6.5 Output Panel
+
+After generation:
+- Summary cards: number of checks, expected record count, LRECL
+- Download buttons for COBOL, JCL, and spec files
+- Checks table showing each reconciliation check embedded in the COBOL program
+
+### 6.6 Output Folder
+
+```
+{job-folder}/reports/mainframe-recon/
+├── {ProgramName}_recon_{timestamp}.cbl
+├── {JobName}_recon_{timestamp}.jcl
+└── recon_program_spec_{timestamp}.txt
+```
+
+### 6.7 Processing Characteristics
+
+- 100% deterministic — no AI involved.
+- Uses exactly the same field-width calculation as `TargetFileGenerationService` to ensure correct REFERENCE MODIFICATION positions.
+- COBOL paragraph names generated as `9100-CHK-RECS`, `9101-CHK-{field1}`, `9102-CHK-{field2}`, etc.
+
+---
+
+## 7. Tab 4 — AI Development Agent
 
 This tab provides AI-generated development guidance using job artifacts and metadata.
 
-### 6.1 Input
+### 7.1 Input
 
 - **Job ID** (required)
 
-### 6.2 Available Actions
+### 7.2 Available Actions
 
 #### Understanding
 
@@ -151,7 +254,7 @@ This tab provides AI-generated development guidance using job artifacts and meta
 - **Validation Logic**
 - **Error Handling**
 
-### 6.3 Output Structure
+### 7.3 Output Structure
 
 The response section is tabbed and includes:
 
@@ -167,49 +270,51 @@ Additional metadata shown:
 - Response time
 - Governance warning
 
-### 6.4 Export/Utility Actions
+### 7.4 Export/Utility Actions
 
 - Copy response
 - Export as `.doc`
 - Print / Save as PDF
 
-### 6.5 Runtime Dependency
+### 7.5 Runtime Dependency
 
 AI actions require the Python AI service to be available. If unavailable, the UI returns a clear error message.
 
 ---
 
-## 7. End-to-End Usage Flow
+## 8. End-to-End Usage Flow
 
 1. Open Mainframe Development Centre.
-2. Set a valid workflow **Job ID**.
-3. Run **Mainframe Artifacts** generation.
-4. Optionally run **Mainframe Assets** generation.
-5. Use **AI Development Agent** for explanation/review/enhancement.
-6. Download outputs and complete developer validation.
+2. Set a valid workflow **Job ID** (one with Steps 10–13 completed for full functionality).
+3. Run **Mainframe Artifacts** generation (Tab 1).
+4. Optionally run **Mainframe Assets** generation (Tab 2) for COBOL/JCL load skeletons.
+5. Run **Recon Program** generation (Tab 3) to produce the mainframe-side verification program.
+6. Use **AI Development Agent** (Tab 4) for explanation/review/enhancement of any generated code.
+7. Download outputs and complete developer validation.
 
 ---
 
-## 8. Error Handling and Validation
+## 9. Error Handling and Validation
 
 The module includes explicit validation and failure messaging.
 
-### 8.1 Common Validations
+### 9.1 Common Validations
 
 - Missing `Job ID`
 - Missing output files during download
+- Required artifacts missing (reconciliation_config or reconciliation_result not yet generated)
 - AI service unavailable
 - AI response missing or null
 
-### 8.2 Error Surface
+### 9.2 Error Surface
 
-- Inline UI alert banners
+- Inline UI alert banners (separate per tab: `Success`, `AssetSuccess`, `ReconSuccess`, `Error`, `AssetError`, `ReconError`)
 - JSON error responses for AI action calls
 - Logged server-side exceptions with job/agent context
 
 ---
 
-## 9. Governance and Production Readiness
+## 10. Governance and Production Readiness
 
 - Deterministic outputs still require business validation.
 - AI outputs are advisory and must be reviewed.
@@ -219,29 +324,42 @@ Recommended review checklist:
 
 - Field lengths, PIC, and alignment
 - Transformation and mapping assumptions
+- REFERENCE MODIFICATION positions (verify against actual target record layout)
+- Expected values in the Recon Program (verify against source system reconciliation)
 - Error handling and reject logic
 - Batch scheduling and dataset controls in JCL
+- Dataset names in all JCL DD statements
 
 ---
 
-## 10. Related Implementation Points
+## 11. Related Implementation Points
 
 - UI view: `Views/Mainframe/Index.cshtml`
 - Controller endpoints: `Controllers/MainframeController.cs`
-  - `Generate`
-  - `Download`
-  - `GenerateAssets`
-  - `DownloadAsset`
-  - `RunAgentAction`
+  - `Generate` — Tab 1 artifacts
+  - `Download` — Tab 1 downloads
+  - `GenerateAssets` — Tab 2 assets
+  - `DownloadAsset` — Tab 2 downloads
+  - `GenerateReconProgram` — Tab 3 recon program
+  - `DownloadReconProgram` — Tab 3 downloads
+  - `RunAgentAction` — Tab 4 AI agent (AJAX)
+- Services:
+  - `MainframeArtifactGenerationService` — Tab 1
+  - `MainframeAssetGenerationService` — Tab 2
+  - `ReconProgramGenerationService` — Tab 3
+  - `PythonMainframeAiAgentService` — Tab 4
+- Interfaces: `IMainframeArtifactGenerationService`, `IMainframeAssetGenerationService`, `IReconProgramGenerationService`, `IMainframeAiAgentService`
+- DTOs: `MainframeArtifactPageDto`, `MainframeAssetPageDto`, `ReconProgramPageDto`, `ReconProgramRequest`, `ReconProgramResultDto`, `ReconCheckDto`
 
 ---
 
-## 11. Summary
+## 12. Summary
 
 The Mainframe Development Centre is the single operational hub for:
 
-- deterministic artifact generation,
-- starter mainframe asset generation, and
-- AI-assisted mainframe development guidance,
+- deterministic artifact generation (Tab 1),
+- starter mainframe asset generation including COBOL load skeleton (Tab 2),
+- COBOL reconciliation verification program generation for mainframe-side recon (Tab 3), and
+- AI-assisted mainframe development guidance (Tab 4),
 
 all under one consistent job context for better traceability and faster implementation.

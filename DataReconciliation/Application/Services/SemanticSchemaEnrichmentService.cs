@@ -40,42 +40,38 @@ namespace DataReconciliation.Application.Services
                 EnrichedAt = DateTime.UtcNow
             };
 
-            // Ambiguous = no clear meaning inferred by profiler, or very short field name
-            var ambiguousFields = profile.Fields
-                .Where(f => string.IsNullOrWhiteSpace(f.PossibleMeaning) || f.FieldName.Length <= 3)
-                .ToHashSet();
-
-            _logger.LogInformation("Identified {Count} ambiguous fields for AI enrichment. JobId={JobId}", ambiguousFields.Count, jobId);
+            _logger.LogInformation("Enriching all {Count} fields via AI. JobId={JobId}", profile.Fields.Count, jobId);
 
             foreach (var field in profile.Fields)
             {
                 var enrichment = new SemanticFieldEnrichment
                 {
-                    FieldName = field.FieldName,
-                    WasAIEnriched = false,
-                    ConfidenceScore = 1.0,
-                    SemanticMeaning = field.PossibleMeaning
+                    FieldName       = field.FieldName,
+                    WasAIEnriched   = false,
+                    ConfidenceScore = 0.0,
+                    SemanticMeaning = field.PossibleMeaning,
+                    BusinessCategory = InferBusinessCategory(field.FieldName)
                 };
 
-                if (ambiguousFields.Contains(field))
+                var aiEnrichment = await CallSemanticEnrichmentAsync(jobId, field, profile.Dataset);
+                if (aiEnrichment != null)
                 {
-                    var aiEnrichment = await CallSemanticEnrichmentAsync(jobId, field, profile.Dataset);
-                    if (aiEnrichment != null)
-                    {
-                        enrichment.SemanticMeaning        = aiEnrichment.SemanticMeaning        ?? enrichment.SemanticMeaning;
-                        enrichment.ExpandedAbbreviation   = aiEnrichment.ExpandedAbbreviation;
-                        enrichment.BusinessCategory       = aiEnrichment.BusinessCategory;
-                        enrichment.InterpretedDescription = aiEnrichment.InterpretedDescription;
-                        enrichment.ConfidenceScore        = aiEnrichment.ConfidenceScore;
-                        enrichment.WasAIEnriched          = true;
-                        _logger.LogInformation(
-                            "Field enriched via /api/semantic-enrichment. JobId={JobId} Field={Field} Meaning={Meaning} Confidence={Conf}",
-                            jobId, field.FieldName, enrichment.SemanticMeaning, enrichment.ConfidenceScore);
-                    }
+                    enrichment.SemanticMeaning        = aiEnrichment.SemanticMeaning        ?? enrichment.SemanticMeaning;
+                    enrichment.ExpandedAbbreviation   = aiEnrichment.ExpandedAbbreviation;
+                    enrichment.BusinessCategory       = aiEnrichment.BusinessCategory       ?? enrichment.BusinessCategory;
+                    enrichment.InterpretedDescription = aiEnrichment.InterpretedDescription;
+                    enrichment.DataTypeHint           = aiEnrichment.DataTypeHint;
+                    enrichment.ConfidenceScore        = aiEnrichment.ConfidenceScore;
+                    enrichment.WasAIEnriched          = true;
+                    _logger.LogInformation(
+                        "Field enriched via /api/semantic-enrichment. JobId={JobId} Field={Field} Meaning={Meaning} Confidence={Conf}",
+                        jobId, field.FieldName, enrichment.SemanticMeaning, enrichment.ConfidenceScore);
                 }
                 else
                 {
-                    enrichment.BusinessCategory = InferBusinessCategory(field.FieldName);
+                    _logger.LogWarning(
+                        "AI enrichment unavailable for field — using deterministic fallback. JobId={JobId} Field={Field}",
+                        jobId, field.FieldName);
                 }
 
                 enrichedProfile.EnrichedFields.Add(enrichment);

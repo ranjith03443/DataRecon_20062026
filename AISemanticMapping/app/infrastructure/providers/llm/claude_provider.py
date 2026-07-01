@@ -15,6 +15,7 @@ from app.infrastructure.config.config_loader import get_app_config
 from app.infrastructure.providers.llm.illm_provider import ILLMProvider, LLMResponse
 from app.shared.constants.app_constants import LogCategories, WorkflowStepConstants
 from app.shared.exceptions.base_exceptions import ProviderException
+from app.shared.utilities.sanitizer import safe_exc
 
 
 _MAX_RETRIES = 3
@@ -141,7 +142,7 @@ class ClaudeProvider(ILLMProvider):
                 latency_ms = (time.monotonic() - start_time) * 1000
                 logger.warning(
                     f"[ClaudeProvider] Connection/Timeout error | attempt={attempt + 1} | "
-                    f"error={str(exc)[:100]} | job_id={job_id} | latency_ms={latency_ms:.1f}",
+                    f"error={safe_exc(exc, 100)} | job_id={job_id} | latency_ms={latency_ms:.1f}",
                     category=LogCategories.LLM_CALL,
                 )
                 last_exception = ProviderException(
@@ -182,7 +183,7 @@ class ClaudeProvider(ILLMProvider):
             return healthy
         except Exception as exc:
             logger.error(
-                f"[ClaudeProvider] Health check FAILED: {str(exc)[:200]}",
+                f"[ClaudeProvider] Health check FAILED: {safe_exc(exc)}",
                 category=LogCategories.HEALTH,
             )
             return False

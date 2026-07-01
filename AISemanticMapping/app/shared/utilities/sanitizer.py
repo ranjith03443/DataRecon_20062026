@@ -71,3 +71,13 @@ def truncate_for_log(value: str, max_length: int = 200) -> str:
     if len(value) > max_length:
         return value[:max_length] + f"...[TRUNCATED, total={len(value)} chars]"
     return value
+
+
+def safe_exc(exc: Exception, limit: int = 200) -> str:
+    """
+    Return an exception string safe for loguru f-string log messages.
+    Escapes { and } so loguru's internal .format() call does not treat
+    JSON-like error payloads (e.g. {"type": "invalid_request_error"})
+    as format placeholders, which would raise KeyError.
+    """
+    return str(exc)[:limit].replace("{", "{{").replace("}", "}}")

@@ -98,6 +98,17 @@ namespace DataReconciliation.Application.Interfaces
     }
 
     /// <summary>
+    /// Generates a COBOL reconciliation verification program and JCL from a completed job's
+    /// reconciliation_config.json and reconciliation_result.json.  The COBOL reads the
+    /// target fixed-width .dat file and verifies counts/sums match the expected values.
+    /// </summary>
+    public interface IReconProgramGenerationService
+    {
+        Task<ReconProgramResultDto> GenerateAsync(string jobId, ReconProgramRequest request);
+        Task<string?> ResolveProgramPathAsync(string jobId, string fileName);
+    }
+
+    /// <summary>
     /// Calls the Python Mainframe Development AI Agent endpoints.
     /// Returns AI-generated explanations, reviews, enhancements, and guidance.
     /// Advisory only — all output is developer review required.

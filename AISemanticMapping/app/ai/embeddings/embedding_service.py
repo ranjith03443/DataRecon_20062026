@@ -14,6 +14,7 @@ from app.infrastructure.providers.embeddings.embedding_factory import EmbeddingP
 from app.infrastructure.providers.embeddings.iembedding_provider import IEmbeddingProvider
 from app.shared.constants.app_constants import LogCategories, WorkflowStepConstants
 from app.shared.exceptions.base_exceptions import EmbeddingException
+from app.shared.utilities.sanitizer import safe_exc
 
 
 class EmbeddingService:
@@ -117,7 +118,7 @@ class EmbeddingService:
 
             except EmbeddingException as exc:
                 logger.error(
-                    f"[EmbeddingService] Embedding generation FAILED | error={str(exc)[:200]} | "
+                    f"[EmbeddingService] Embedding generation FAILED | error={safe_exc(exc)} | "
                     f"job_id={job_id} | request_id={request_id} | "
                     f"workflow_step={WorkflowStepConstants.EMBEDDING_GENERATION}",
                     category=LogCategories.EMBEDDING,

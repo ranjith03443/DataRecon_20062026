@@ -12,6 +12,7 @@ from app.infrastructure.vectorstore.ivectorstore import IVectorStore, VectorSear
 from app.infrastructure.vectorstore.vectorstore_factory import VectorStoreFactory
 from app.shared.constants.app_constants import CollectionNames, LogCategories, WorkflowStepConstants
 from app.shared.exceptions.base_exceptions import RAGException
+from app.shared.utilities.sanitizer import safe_exc
 
 
 class SemanticRetrieverService:
@@ -179,7 +180,7 @@ class SemanticRetrieverService:
             # RAG is optional — log and continue without retrieval
             logger.warning(
                 f"[SemanticRetrieverService] Retrieval FAILED (graceful fallback) | "
-                f"collection={collection} | error={str(exc)[:200]} | job_id={job_id}",
+                f"collection={collection} | error={safe_exc(exc)} | job_id={job_id}",
                 category=LogCategories.RAG,
             )
             return []

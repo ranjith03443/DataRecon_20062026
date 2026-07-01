@@ -55,6 +55,10 @@ _PROMPT_MAP = {
     "documentation":    "mainframe_documentation_v1",
     "jcl_improvements": "mainframe_jcl_improvements_v1",
     "optimization":     "mainframe_optimization_v1",
+    "generate_cobol":         "mainframe_generate_cobol_v1",
+    "generate_jcl":           "mainframe_generate_jcl_v1",
+    "generate_recon_cobol":   "mainframe_generate_recon_cobol_v1",
+    "generate_recon_jcl":     "mainframe_generate_recon_jcl_v1",
 }
 
 _AGENT_NAMES = {
@@ -66,6 +70,10 @@ _AGENT_NAMES = {
     "documentation":    "Developer Documentation Agent",
     "jcl_improvements": "JCL Improvement Agent",
     "optimization":     "Optimisation Agent",
+    "generate_cobol":         "COBOL Generation Agent",
+    "generate_jcl":           "JCL Generation Agent",
+    "generate_recon_cobol":   "Recon COBOL Generation Agent",
+    "generate_recon_jcl":     "Recon JCL Generation Agent",
 }
 
 _GOVERNANCE = (
@@ -73,6 +81,17 @@ _GOVERNANCE = (
     "*** Developer Review Required       ***\n"
     "*** Not Production Ready            ***"
 )
+
+# Code-generation prompts produce complete programs — need a much larger token budget
+# than the default 2 000 used for advisory prompts (explain, review, etc.)
+_CODE_GEN_PROMPT_TYPES = {
+    "generate_cobol",
+    "generate_jcl",
+    "generate_recon_cobol",
+    "generate_recon_jcl",
+}
+_CODE_GEN_MAX_TOKENS = 16000
+_DEFAULT_MAX_TOKENS  = 4000
 
 
 class MainframeAgentService:
@@ -90,7 +109,7 @@ class MainframeAgentService:
         prompt_versioning: Optional[PromptVersioningService] = None,
     ):
         self._config = get_app_config()
-        self._llm = llm_provider or LLMProviderFactory.create(task="semantic_mapping")
+        self._llm = llm_provider or LLMProviderFactory.create(task="mainframe_agent")
         self._embedding_service = embedding_service or EmbeddingService()
         self._retriever = retriever or SemanticRetrieverService(
             embedding_service=self._embedding_service
@@ -144,11 +163,17 @@ class MainframeAgentService:
         )
 
         # ── Call LLM ──────────────────────────────────────────────────────────
+        max_tokens = (
+            _CODE_GEN_MAX_TOKENS
+            if prompt_type in _CODE_GEN_PROMPT_TYPES
+            else _DEFAULT_MAX_TOKENS
+        )
         t_llm = time.monotonic()
         llm_response = await self._llm.complete(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             json_mode=True,
+            max_tokens=max_tokens,
         )
         llm_ms = (time.monotonic() - t_llm) * 1000
 
@@ -238,9 +263,8 @@ class MainframeAgentService:
             return "\n".join(ctx_lines)
 
         except Exception as exc:
-            logger.warning(
-                f"[MainframeAgentService] RAG retrieval failed (non-fatal): {exc}",
-                category=LogCategories.RAG,
+            logger.bind(category=LogCategories.RAG).warning(
+                f"[MainframeAgentService] RAG retrieval failed (non-fatal): {exc}"
             )
             return "RAG retrieval unavailable."
 
@@ -282,16 +306,45 @@ class MainframeAgentService:
             except Exception:
                 mappings_str = str(request.fieldMappings)[:3000]
 
+        field_details_str = ""
+        if request.fieldDetails:
+            try:
+                field_details_str = json.dumps(request.fieldDetails, indent=2)[:4000]
+            except Exception:
+                field_details_str = str(request.fieldDetails)[:4000]
+
+        recon_checks_str = ""
+        if request.reconChecks:
+            try:
+                recon_checks_str = json.dumps(request.reconChecks, indent=2)[:4000]
+            except Exception:
+                recon_checks_str = str(request.reconChecks)[:4000]
+
+        source_datasets_str = ""
+        if request.sourceDatasets:
+            try:
+                source_datasets_str = json.dumps(request.sourceDatasets, indent=2)[:2000]
+            except Exception:
+                source_datasets_str = str(request.sourceDatasets)[:2000]
+
         variables = {
-            "cobol_content":        cobol_snippet or "(not provided)",
-            "jcl_content":          jcl_snippet or "(not provided)",
-            "copybook_content":     copybook_snippet or "(not provided)",
-            "value_mappings":       value_map_str or "(not provided)",
-            "transformation_rules": rules_str or "(not provided)",
-            "field_mappings":       mappings_str or "(not provided)",
-            "rag_context":          rag_context or "(none)",
-            "prompt_type":          prompt_type,
-            "job_id":               request.jobId,
+            "cobol_content":          cobol_snippet or "(not provided)",
+            "jcl_content":            jcl_snippet or "(not provided)",
+            "copybook_content":       copybook_snippet or "(not provided)",
+            "value_mappings":         value_map_str or "(not provided)",
+            "transformation_rules":   rules_str or "(not provided)",
+            "field_mappings":         mappings_str or "(not provided)",
+            "rag_context":            rag_context or "(none)",
+            "prompt_type":            prompt_type,
+            "job_id":                 request.jobId,
+            "program_name":           request.programName or "PGMNAME",
+            "record_name":            request.recordName or "RECORD",
+            "job_name":               request.jobName or "JOBNAME",
+            "total_record_length":    str(request.totalRecordLength or 0),
+            "field_details":          field_details_str or "(not provided)",
+            "expected_record_count":  str(request.expectedRecordCount or 0),
+            "recon_checks":           recon_checks_str or "(not provided)",
+            "source_datasets":        source_datasets_str or "(not provided)",
         }
 
         # Use PromptManager.render_system_prompt() and render_user_prompt()
@@ -313,6 +366,42 @@ class MainframeAgentService:
         stripped = re.sub(r'\n?```\s*$', '', stripped)
         return stripped.strip()
 
+    @staticmethod
+    def _escape_json_strings(text: str) -> str:
+        """
+        Fix a common LLM JSON generation error: literal newlines/tabs/carriage-returns
+        embedded inside JSON string values instead of the required \\n / \\t escapes.
+        Walks the text character-by-character to stay in sync with the in/out-of-string state.
+        """
+        result: list[str] = []
+        in_string = False
+        escape_next = False
+        for ch in text:
+            if escape_next:
+                result.append(ch)
+                escape_next = False
+                continue
+            if ch == '\\' and in_string:
+                result.append(ch)
+                escape_next = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+                result.append(ch)
+                continue
+            if in_string:
+                if ch == '\n':
+                    result.append('\\n')
+                elif ch == '\r':
+                    result.append('\\r')
+                elif ch == '\t':
+                    result.append('\\t')
+                else:
+                    result.append(ch)
+            else:
+                result.append(ch)
+        return ''.join(result)
+
     def _parse_response(
         self,
         raw: str,
@@ -324,22 +413,46 @@ class MainframeAgentService:
         cleaned = self._strip_markdown_fences(raw)
 
         data = None
+
+        # Pass 1: direct parse
         try:
             data = json.loads(cleaned)
         except json.JSONDecodeError:
-            # Regex fallback: extract the outermost {...} block
+            pass
+
+        # Pass 2: escape unescaped control chars inside string values, then parse
+        if data is None:
+            try:
+                data = json.loads(self._escape_json_strings(cleaned))
+            except json.JSONDecodeError:
+                pass
+
+        # Pass 3: extract outermost {...} block, then apply escaping and parse
+        if data is None:
             match = re.search(r'\{.*\}', cleaned, re.DOTALL)
             if match:
                 try:
-                    data = json.loads(match.group())
+                    data = json.loads(self._escape_json_strings(match.group()))
                 except json.JSONDecodeError:
                     pass
 
+        # Pass 4: detect raw COBOL/JCL output (LLM ignored the JSON instruction)
         if data is None:
-            logger.warning(
-                f"[MainframeAgentService] LLM response not valid JSON after all attempts, "
-                f"treating as plain text | job_id={job_id}",
-                category=LogCategories.MAINFRAME_AI_AGENT,
+            stripped_raw = raw.strip()
+            looks_like_cobol = re.match(r'^\s{6,}(IDENTIFICATION|\*)', stripped_raw, re.IGNORECASE)
+            looks_like_jcl  = stripped_raw.startswith('//')
+            if looks_like_cobol or looks_like_jcl:
+                data = {
+                    "generatedCode": stripped_raw,
+                    "confidence": 0.65,
+                    "reasoning": "Response was raw COBOL/JCL — JSON wrapper was absent.",
+                }
+
+        if data is None:
+            logger.bind(category=LogCategories.MAINFRAME_AI_AGENT).warning(
+                f"[MainframeAgentService] LLM response not valid JSON after all attempts | "
+                f"job_id={job_id} | response_len={len(raw)} | "
+                f"first_200_chars={raw[:200]!r}"
             )
             data = {
                 "businessExplanation": raw,

@@ -36,6 +36,27 @@ class MainframeAgentRequestDTO(BaseModel):
         None, description="Parsed target_schema_metadata.json"
     )
 
+    # Generation metadata — used by generate_cobol and generate_jcl prompt types
+    programName: Optional[str] = Field(None, description="COBOL program name (max 8 chars)")
+    recordName: Optional[str] = Field(None, description="Target record name")
+    jobName: Optional[str] = Field(None, description="JCL job name (max 8 chars)")
+    totalRecordLength: Optional[int] = Field(None, description="Target fixed-width record LRECL")
+    fieldDetails: Optional[List[Dict[str, Any]]] = Field(
+        None,
+        description="Full field layout: name, cobolName, dataType, startPosition, length, picClause, sourceField, isRequired, format, rule",
+    )
+    sourceDatasets: Optional[List[Dict[str, Any]]] = Field(
+        None,
+        description="Distinct source datasets: [{datasetId, fields: [sourceFieldName,...], fieldCount}]. One entry per input file; drives SELECT/FD generation.",
+    )
+
+    # Recon-program metadata — used by generate_recon_cobol and generate_recon_jcl prompt types
+    expectedRecordCount: Optional[int] = Field(None, description="Expected total record count from reconciliation_result.json")
+    reconChecks: Optional[List[Dict[str, Any]]] = Field(
+        None,
+        description="List of recon check dicts: fieldName, reconType (SUM|COUNT), cobolVarName, startPosition, length, expectedValue, sourceField",
+    )
+
     # Audit
     requestId: Optional[str] = Field(None, description="Correlation / request ID")
     userId: Optional[str] = Field(None, description="User triggering the request")

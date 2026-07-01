@@ -25,6 +25,14 @@ models:
     top_p: 1.0
     request_timeout: 60
 
+  mainframe_agent:
+    provider: claude
+    model_name: claude-sonnet-4-6
+    temperature: 0.1
+    max_tokens: 16000
+    top_p: 1.0
+    request_timeout: 300
+
 embedding_models:
   default:
     model_name: text-embedding-3-small
@@ -72,3 +80,10 @@ claude_models:
     temperature: 0.0
     max_tokens: 1000
     request_timeout: 60
+
+  mainframe_agent:
+    provider: claude
+    model_name: claude-sonnet-4-6
+    temperature: 0.1
+    max_tokens: 16000
+    request_timeout: 300

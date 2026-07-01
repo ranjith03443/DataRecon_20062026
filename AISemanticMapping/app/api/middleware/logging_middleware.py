@@ -12,6 +12,7 @@ from loguru import logger
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.shared.constants.app_constants import AppConstants, LogCategories
+from app.shared.utilities.sanitizer import safe_exc
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
@@ -51,7 +52,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             logger.error(
                 f"[RequestLoggingMiddleware] Unhandled exception | "
                 f"method={request.method} | path={request.url.path} | "
-                f"error={str(exc)[:200]} | latency_ms={latency_ms:.1f} | "
+                f"error={safe_exc(exc)} | latency_ms={latency_ms:.1f} | "
                 f"request_id={request_id} | correlation_id={correlation_id}",
                 category=LogCategories.API_REQUEST,
             )

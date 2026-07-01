@@ -36,7 +36,7 @@ from app.infrastructure.providers.llm.llm_factory import LLMProviderFactory
 from app.shared.constants.app_constants import LogCategories, WorkflowStepConstants
 from app.shared.exceptions.base_exceptions import SemanticMappingException
 from app.shared.utilities.hash_utils import build_cache_key
-from app.shared.utilities.sanitizer import sanitize_prompt
+from app.shared.utilities.sanitizer import sanitize_prompt, safe_exc
 
 _PROMPT_ID = "semantic_mapping_v1"
 
@@ -142,7 +142,7 @@ class SemanticMappingService:
             except Exception as exc:
                 logger.warning(
                     f"[SemanticMappingService] RAG retrieval failed (continuing without context) | "
-                    f"error={str(exc)[:100]} | job_id={job_id}",
+                    f"error={safe_exc(exc, 100)} | job_id={job_id}",
                     category=LogCategories.RAG,
                 )
 
@@ -177,7 +177,7 @@ class SemanticMappingService:
             )
         except Exception as exc:
             logger.error(
-                f"[SemanticMappingService] LLM inference FAILED | error={str(exc)[:200]} | "
+                f"[SemanticMappingService] LLM inference FAILED | error={safe_exc(exc)} | "
                 f"job_id={job_id} | request_id={effective_request_id}",
                 category=LogCategories.LLM_CALL,
             )

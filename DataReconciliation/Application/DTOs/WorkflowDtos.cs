@@ -289,6 +289,8 @@ namespace DataReconciliation.Application.DTOs
         public MainframeArtifactGenerationResultDto? Result { get; set; }
         /// <summary>Carries asset generation state when returning to the same Index view.</summary>
         public MainframeAssetPageDto? AssetPageModel { get; set; }
+        /// <summary>Carries recon program generation state when returning to the same Index view.</summary>
+        public ReconProgramPageDto? ReconPageModel { get; set; }
     }
 
     // ─── Value Mapping Workbench DTOs ───────────────────────────────────────────
@@ -347,6 +349,7 @@ namespace DataReconciliation.Application.DTOs
         public bool GenerateTechnicalSpec { get; set; } = true;
         public bool GenerateSampleRecords { get; set; } = true;
         public int SampleRecordCount { get; set; } = 10;
+        public bool UseAiMode { get; set; } = false;
     }
 
     public class MainframeAssetFieldDto
@@ -381,6 +384,9 @@ namespace DataReconciliation.Application.DTOs
         public string? JclSkeletonFileName { get; set; }
         public string? TechnicalSpecFileName { get; set; }
         public string? SampleRecordsFileName { get; set; }
+        // AI Mode indicators
+        public bool CobolAiGenerated { get; set; }
+        public bool JclAiGenerated { get; set; }
     }
 
     public class MainframeAssetPageDto
@@ -388,6 +394,54 @@ namespace DataReconciliation.Application.DTOs
         public string JobId { get; set; } = string.Empty;
         public MainframeAssetRequest Request { get; set; } = new();
         public MainframeAssetGenerationResultDto? AssetResult { get; set; }
+    }
+
+    // ─── Recon Program Generation DTOs ────────────────────────────────────────
+
+    public class ReconProgramRequest
+    {
+        public string ProgramName { get; set; } = "RECONPGM";
+        public string JobName { get; set; } = "RECONJOB";
+        public bool GenerateCobol { get; set; } = true;
+        public bool GenerateJcl { get; set; } = true;
+        public bool GenerateSpec { get; set; } = true;
+        public bool UseAiMode { get; set; } = false;
+    }
+
+    /// <summary>One reconciliation check emitted in the COBOL program.</summary>
+    public class ReconCheckDto
+    {
+        public string FieldName { get; set; } = string.Empty;
+        public string ReconType { get; set; } = "COUNT";        // SUM or COUNT
+        public string CobolVarName { get; set; } = string.Empty; // e.g. TOTALAMOUNT
+        public string PicClause { get; set; } = string.Empty;
+        public int StartPosition { get; set; }
+        public int Length { get; set; }
+        public string ExpectedValue { get; set; } = string.Empty; // from reconciliation_result
+        public string? SourceField { get; set; }
+    }
+
+    public class ReconProgramResultDto
+    {
+        public string JobId { get; set; } = string.Empty;
+        public string ProgramName { get; set; } = string.Empty;
+        public string JobName { get; set; } = string.Empty;
+        public DateTime GeneratedAt { get; set; }
+        public int TotalExpectedRecords { get; set; }
+        public int TotalRecordLength { get; set; }
+        public List<ReconCheckDto> Checks { get; set; } = new();
+        public string? CobolFileName { get; set; }
+        public string? JclFileName { get; set; }
+        public string? SpecFileName { get; set; }
+        public bool CobolAiGenerated { get; set; }
+        public bool JclAiGenerated { get; set; }
+    }
+
+    public class ReconProgramPageDto
+    {
+        public string JobId { get; set; } = string.Empty;
+        public ReconProgramRequest Request { get; set; } = new();
+        public ReconProgramResultDto? Result { get; set; }
     }
 
     // ─── Enhancement 1: Delta File Upload DTOs ─────────────────────────────────

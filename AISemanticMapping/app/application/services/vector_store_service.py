@@ -19,7 +19,7 @@ from app.infrastructure.vectorstore.ivectorstore import IVectorStore
 from app.infrastructure.vectorstore.vectorstore_factory import VectorStoreFactory
 from app.shared.constants.app_constants import LogCategories, WorkflowStepConstants
 from app.shared.exceptions.base_exceptions import VectorStoreException
-from app.shared.utilities.sanitizer import sanitize_prompt
+from app.shared.utilities.sanitizer import sanitize_prompt, safe_exc
 
 
 class VectorStoreService:
@@ -115,7 +115,7 @@ class VectorStoreService:
         except Exception as exc:
             logger.error(
                 f"[VectorStoreService] Indexing FAILED | collection={request.collection} | "
-                f"error={str(exc)[:200]} | job_id={job_id}",
+                f"error={safe_exc(exc)} | job_id={job_id}",
                 category=LogCategories.VECTOR_STORE,
             )
             raise VectorStoreException(
@@ -191,7 +191,7 @@ class VectorStoreService:
         except Exception as exc:
             logger.error(
                 f"[VectorStoreService] Search FAILED | collection={request.collection} | "
-                f"error={str(exc)[:200]} | job_id={job_id}",
+                f"error={safe_exc(exc)} | job_id={job_id}",
                 category=LogCategories.VECTOR_STORE,
             )
             raise VectorStoreException(

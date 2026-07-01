@@ -11,6 +11,7 @@ from loguru import logger
 from app.domain.enums.confidence_enums import ConfidenceLevel, classify_confidence
 from app.shared.constants.app_constants import LogCategories, WorkflowStepConstants
 from app.shared.exceptions.base_exceptions import AIResponseValidationException
+from app.shared.utilities.sanitizer import safe_exc
 
 
 class AIResponseValidator:
@@ -73,7 +74,7 @@ class AIResponseValidator:
             return parsed
         except json.JSONDecodeError as exc:
             logger.error(
-                f"[AIResponseValidator] JSON parse FAILED | error={str(exc)} | "
+                f"[AIResponseValidator] JSON parse FAILED | error={safe_exc(exc)} | "
                 f"raw_length={len(raw_response)} | job_id={job_id} | request_id={request_id}",
                 category=LogCategories.AUDIT,
             )

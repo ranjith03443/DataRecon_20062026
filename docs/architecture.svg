@@ -1,0 +1,658 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1620 1040" width="1620" height="1040">
+  <defs>
+    <linearGradient id="hdr" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0c1a3a"/>
+      <stop offset="50%" stop-color="#1a3a6e"/>
+      <stop offset="100%" stop-color="#0c1a3a"/>
+    </linearGradient>
+    <linearGradient id="csBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#EFF6FF"/>
+      <stop offset="100%" stop-color="#DBEAFE"/>
+    </linearGradient>
+    <linearGradient id="pyBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#F0FDF4"/>
+      <stop offset="100%" stop-color="#DCFCE7"/>
+    </linearGradient>
+    <linearGradient id="storeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#F8FAFC"/>
+      <stop offset="100%" stop-color="#F1F5F9"/>
+    </linearGradient>
+    <marker id="aBlue" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#2563EB"/>
+    </marker>
+    <marker id="aGreen" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#16A34A"/>
+    </marker>
+    <marker id="aOrange" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#EA580C"/>
+    </marker>
+    <marker id="aGray" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#64748B"/>
+    </marker>
+    <marker id="aPurple" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#7C3AED"/>
+    </marker>
+    <filter id="cardShadow">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-color="#0000001a"/>
+    </filter>
+    <filter id="colShadow">
+      <feDropShadow dx="2" dy="3" stdDeviation="5" flood-color="#00000022"/>
+    </filter>
+  </defs>
+
+  <!-- PAGE BACKGROUND -->
+  <rect width="1620" height="1040" fill="#F0F4F8"/>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       HEADER
+  ═══════════════════════════════════════════════════════════════ -->
+  <rect width="1620" height="70" fill="url(#hdr)"/>
+  <text x="810" y="30" text-anchor="middle" font-family="Segoe UI,Helvetica Neue,Arial,sans-serif"
+        font-size="22" font-weight="700" fill="white" letter-spacing="0.5">
+    DataReconciliation Platform — System Architecture
+  </text>
+  <text x="810" y="55" text-anchor="middle" font-family="Segoe UI,Helvetica Neue,Arial,sans-serif"
+        font-size="12" fill="#93C5FD" letter-spacing="0.3">
+    ASP.NET Core 8 MVC (C#)  ·  Python 3.12 FastAPI  ·  Multi-Provider LLM  ·  ChromaDB Vector Store  ·  SQLite  ·  File-Based Workflow
+  </text>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       COLUMN BACKGROUNDS
+       User: x=18  w=140
+       C#:   x=168 w=632
+       Py:   x=810 w=516
+       Ext:  x=336 w=262  (x=1336)
+  ═══════════════════════════════════════════════════════════════ -->
+
+  <!-- User Tier column -->
+  <rect x="18" y="78" width="140" height="798" rx="10" fill="#FAF5FF" stroke="#7C3AED" stroke-width="1.5" filter="url(#colShadow)"/>
+  <rect x="18" y="78" width="140" height="34" rx="8" fill="#6D28D9"/>
+  <rect x="18" y="100" width="140" height="12" fill="#6D28D9"/>
+  <text x="88" y="100" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="white">USER TIER</text>
+
+  <!-- C# Tier column -->
+  <rect x="168" y="78" width="632" height="798" rx="10" fill="url(#csBg)" stroke="#3B82F6" stroke-width="1.5" filter="url(#colShadow)"/>
+  <rect x="168" y="78" width="632" height="34" rx="8" fill="#1D4ED8"/>
+  <rect x="168" y="100" width="632" height="12" fill="#1D4ED8"/>
+  <text x="484" y="100" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="white">ASP.NET CORE 8 MVC  ·  C#  ·  Port 8080</text>
+
+  <!-- Python Tier column -->
+  <rect x="810" y="78" width="516" height="798" rx="10" fill="url(#pyBg)" stroke="#22C55E" stroke-width="1.5" filter="url(#colShadow)"/>
+  <rect x="810" y="78" width="516" height="34" rx="8" fill="#15803D"/>
+  <rect x="810" y="100" width="516" height="12" fill="#15803D"/>
+  <text x="1068" y="100" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="white">PYTHON FASTAPI AI SERVICE  ·  Python 3.12  ·  Port 8000</text>
+
+  <!-- External APIs column -->
+  <rect x="1336" y="78" width="266" height="798" rx="10" fill="#FFF7ED" stroke="#F97316" stroke-width="1.5" filter="url(#colShadow)"/>
+  <rect x="1336" y="78" width="266" height="34" rx="8" fill="#C2410C"/>
+  <rect x="1336" y="100" width="266" height="12" fill="#C2410C"/>
+  <text x="1469" y="100" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="white">EXTERNAL LLM APIs</text>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       USER TIER — content
+  ═══════════════════════════════════════════════════════════════ -->
+
+  <!-- Browser icon & label -->
+  <text x="88" y="137" text-anchor="middle" font-size="28">🌐</text>
+  <text x="88" y="160" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="600" fill="#4C1D95">Web Browser</text>
+
+  <!-- View pages -->
+  <rect x="28" y="172" width="120" height="18" rx="4" fill="#EDE9FE" stroke="#7C3AED" stroke-width="0.8"/>
+  <text x="88" y="185" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#4C1D95">📂 Workflow UI</text>
+
+  <rect x="28" y="196" width="120" height="18" rx="4" fill="#EDE9FE" stroke="#7C3AED" stroke-width="0.8"/>
+  <text x="88" y="209" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#4C1D95">🏗 Mainframe UI (3 tabs)</text>
+
+  <rect x="28" y="220" width="120" height="18" rx="4" fill="#EDE9FE" stroke="#7C3AED" stroke-width="0.8"/>
+  <text x="88" y="233" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#4C1D95">📊 Reports UI</text>
+
+  <rect x="28" y="244" width="120" height="18" rx="4" fill="#EDE9FE" stroke="#7C3AED" stroke-width="0.8"/>
+  <text x="88" y="257" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#4C1D95">🔧 Schema Generator</text>
+
+  <rect x="28" y="268" width="120" height="18" rx="4" fill="#EDE9FE" stroke="#7C3AED" stroke-width="0.8"/>
+  <text x="88" y="281" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" fill="#4C1D95">⚙ Settings</text>
+
+  <!-- HTTP arrow from user to C# -->
+  <line x1="158" y1="225" x2="168" y2="225" stroke="#7C3AED" stroke-width="2" marker-end="url(#aPurple)"/>
+
+  <!-- Upload label -->
+  <text x="88" y="320" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#6D28D9" font-style="italic">Source CSVs</text>
+  <text x="88" y="333" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#6D28D9" font-style="italic">Target Template</text>
+  <text x="88" y="346" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#6D28D9" font-style="italic">(Excel / CSV)</text>
+  <text x="88" y="358" text-anchor="middle" font-size="14">⬆️</text>
+
+  <!-- Workflow steps label -->
+  <text x="88" y="410" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="600" fill="#5B21B6">Workflow Steps:</text>
+  <text x="88" y="428" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#6D28D9">① Ingest Files</text>
+  <text x="88" y="444" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#6D28D9">② Profile Schema</text>
+  <text x="88" y="460" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#6D28D9">③ AI Field Mapping</text>
+  <text x="88" y="476" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#6D28D9">④ Review &amp; Override</text>
+  <text x="88" y="492" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#6D28D9">⑤ Transform Data</text>
+  <text x="88" y="508" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#6D28D9">⑥ Reconciliation</text>
+  <text x="88" y="524" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#6D28D9">⑦ Mainframe Assets</text>
+  <text x="88" y="540" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#6D28D9">⑧ Recon Program</text>
+
+  <!-- Output label -->
+  <text x="88" y="590" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="600" fill="#5B21B6">Outputs:</text>
+  <text x="88" y="608" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#6D28D9">Fixed-Width .dat</text>
+  <text x="88" y="624" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#6D28D9">COBOL Program</text>
+  <text x="88" y="640" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#6D28D9">JCL Job Stream</text>
+  <text x="88" y="656" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#6D28D9">Copybook (.cpy)</text>
+  <text x="88" y="672" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#6D28D9">Recon COBOL</text>
+  <text x="88" y="688" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#6D28D9">Recon JCL</text>
+  <text x="88" y="704" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#6D28D9">Mapping Reports</text>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       C# TIER — CONTROLLERS section  y=118..195
+  ═══════════════════════════════════════════════════════════════ -->
+  <rect x="180" y="118" width="608" height="78" rx="7" fill="#DBEAFE" stroke="#3B82F6" stroke-width="1" filter="url(#cardShadow)"/>
+  <rect x="180" y="118" width="608" height="20" rx="5" fill="#3B82F6"/>
+  <rect x="180" y="130" width="608" height="8" fill="#3B82F6"/>
+  <text x="484" y="133" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="white">CONTROLLERS  (MVC Pattern)</text>
+
+  <!-- Controller pills row 1 -->
+  <rect x="190" y="146" width="140" height="20" rx="4" fill="white" stroke="#60A5FA" stroke-width="1"/>
+  <text x="260" y="160" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#1E40AF">WorkflowController</text>
+
+  <rect x="338" y="146" width="146" height="20" rx="4" fill="white" stroke="#60A5FA" stroke-width="1"/>
+  <text x="411" y="160" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#1E40AF">MainframeController</text>
+
+  <rect x="492" y="146" width="136" height="20" rx="4" fill="white" stroke="#60A5FA" stroke-width="1"/>
+  <text x="560" y="160" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#1E40AF">ReportsController</text>
+
+  <rect x="636" y="146" width="64" height="20" rx="4" fill="white" stroke="#60A5FA" stroke-width="1"/>
+  <text x="668" y="160" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#1E40AF">Settings</text>
+
+  <!-- Controller pills row 2 -->
+  <rect x="190" y="171" width="168" height="18" rx="4" fill="white" stroke="#60A5FA" stroke-width="1"/>
+  <text x="274" y="184" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#1E40AF">SchemaGeneratorController</text>
+
+  <rect x="366" y="171" width="140" height="18" rx="4" fill="white" stroke="#60A5FA" stroke-width="1"/>
+  <text x="436" y="184" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#1E40AF">WorkflowApiController</text>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       C# TIER — CORE WORKFLOW SERVICES  y=205..325
+  ═══════════════════════════════════════════════════════════════ -->
+  <rect x="180" y="206" width="608" height="120" rx="7" fill="#EFF6FF" stroke="#93C5FD" stroke-width="1" filter="url(#cardShadow)"/>
+  <rect x="180" y="206" width="608" height="18" rx="5" fill="#1E40AF"/>
+  <rect x="180" y="216" width="608" height="8" fill="#1E40AF"/>
+  <text x="484" y="219" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" font-weight="700" fill="white">CORE WORKFLOW SERVICES</text>
+
+  <!-- Pills grid -->
+  <rect x="190" y="231" width="164" height="18" rx="4" fill="white" stroke="#93C5FD" stroke-width="1"/>
+  <text x="272" y="244" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#1E3A8A">FileIngestionService</text>
+
+  <rect x="362" y="231" width="168" height="18" rx="4" fill="white" stroke="#93C5FD" stroke-width="1"/>
+  <text x="446" y="244" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#1E3A8A">DatasetRegistrationService</text>
+
+  <rect x="538" y="231" width="180" height="18" rx="4" fill="white" stroke="#93C5FD" stroke-width="1"/>
+  <text x="628" y="244" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#1E3A8A">SourceSchemaProfilingService</text>
+
+  <rect x="190" y="255" width="180" height="18" rx="4" fill="white" stroke="#93C5FD" stroke-width="1"/>
+  <text x="280" y="268" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#1E3A8A">TargetMetadataExtractionService</text>
+
+  <rect x="378" y="255" width="158" height="18" rx="4" fill="white" stroke="#93C5FD" stroke-width="1"/>
+  <text x="457" y="268" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#1E3A8A">TransformationEngineService</text>
+
+  <rect x="544" y="255" width="174" height="18" rx="4" fill="white" stroke="#93C5FD" stroke-width="1"/>
+  <text x="631" y="268" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#1E3A8A">TargetFileGenerationService</text>
+
+  <rect x="190" y="279" width="172" height="18" rx="4" fill="white" stroke="#93C5FD" stroke-width="1"/>
+  <text x="276" y="292" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#1E3A8A">MappingConsolidationService</text>
+
+  <rect x="370" y="279" width="176" height="18" rx="4" fill="white" stroke="#93C5FD" stroke-width="1"/>
+  <text x="458" y="292" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#1E3A8A">RelationshipResolutionService</text>
+
+  <rect x="554" y="279" width="164" height="18" rx="4" fill="white" stroke="#93C5FD" stroke-width="1"/>
+  <text x="636" y="292" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#1E3A8A">ValueMappingDiscoveryService</text>
+
+  <rect x="190" y="303" width="168" height="18" rx="4" fill="white" stroke="#93C5FD" stroke-width="1"/>
+  <text x="274" y="316" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#1E3A8A">AIMappingInferenceService</text>
+
+  <rect x="366" y="303" width="162" height="18" rx="4" fill="white" stroke="#93C5FD" stroke-width="1"/>
+  <text x="447" y="316" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#1E3A8A">DeterministicMappingService</text>
+
+  <rect x="536" y="303" width="148" height="18" rx="4" fill="white" stroke="#93C5FD" stroke-width="1"/>
+  <text x="610" y="316" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#1E3A8A">ReconciliationService</text>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       C# TIER — MAINFRAME SERVICES  y=337..425
+  ═══════════════════════════════════════════════════════════════ -->
+  <rect x="180" y="337" width="608" height="88" rx="7" fill="#F0F9FF" stroke="#7DD3FC" stroke-width="1" filter="url(#cardShadow)"/>
+  <rect x="180" y="337" width="608" height="18" rx="5" fill="#075985"/>
+  <rect x="180" y="347" width="608" height="8" fill="#075985"/>
+  <text x="484" y="350" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" font-weight="700" fill="white">MAINFRAME SERVICES  (Tab 1 · Tab 3)</text>
+
+  <rect x="190" y="362" width="186" height="18" rx="4" fill="white" stroke="#7DD3FC" stroke-width="1"/>
+  <text x="283" y="375" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#0C4A6E">MainframeAssetGenerationService</text>
+
+  <rect x="384" y="362" width="196" height="18" rx="4" fill="white" stroke="#7DD3FC" stroke-width="1"/>
+  <text x="482" y="375" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#0C4A6E">MainframeArtifactGenerationService</text>
+
+  <rect x="588" y="362" width="192" height="18" rx="4" fill="white" stroke="#7DD3FC" stroke-width="1"/>
+  <text x="684" y="375" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#0C4A6E">ReconProgramGenerationService</text>
+
+  <rect x="190" y="386" width="150" height="18" rx="4" fill="white" stroke="#7DD3FC" stroke-width="1"/>
+  <text x="265" y="399" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#0C4A6E">COBOL (Static + AI Mode)</text>
+
+  <rect x="348" y="386" width="128" height="18" rx="4" fill="white" stroke="#7DD3FC" stroke-width="1"/>
+  <text x="412" y="399" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#0C4A6E">JCL (Static + AI Mode)</text>
+
+  <rect x="484" y="386" width="120" height="18" rx="4" fill="white" stroke="#7DD3FC" stroke-width="1"/>
+  <text x="544" y="399" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#0C4A6E">Copybook (.cpy)</text>
+
+  <rect x="612" y="386" width="168" height="18" rx="4" fill="white" stroke="#7DD3FC" stroke-width="1"/>
+  <text x="696" y="399" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#0C4A6E">Recon COBOL + JCL (AI Mode)</text>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       C# TIER — REPORT &amp; SCHEMA SERVICES  y=437..500
+  ═══════════════════════════════════════════════════════════════ -->
+  <rect x="180" y="437" width="608" height="62" rx="7" fill="#F0FDF4" stroke="#86EFAC" stroke-width="1" filter="url(#cardShadow)"/>
+  <rect x="180" y="437" width="608" height="18" rx="5" fill="#166534"/>
+  <rect x="180" y="447" width="608" height="8" fill="#166534"/>
+  <text x="484" y="450" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" font-weight="700" fill="white">REPORTING &amp; SCHEMA</text>
+
+  <rect x="190" y="462" width="150" height="18" rx="4" fill="white" stroke="#86EFAC" stroke-width="1"/>
+  <text x="265" y="475" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#14532D">ReportGenerationService</text>
+
+  <rect x="348" y="462" width="160" height="18" rx="4" fill="white" stroke="#86EFAC" stroke-width="1"/>
+  <text x="428" y="475" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#14532D">TargetSchemaGeneratorService</text>
+
+  <rect x="516" y="462" width="162" height="18" rx="4" fill="white" stroke="#86EFAC" stroke-width="1"/>
+  <text x="597" y="475" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#14532D">SemanticSchemaEnrichmentService</text>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       C# TIER — AI CLIENTS / HTTP BRIDGE  y=511..610
+  ═══════════════════════════════════════════════════════════════ -->
+  <rect x="180" y="511" width="608" height="98" rx="7" fill="#FFF7ED" stroke="#FCA5A5" stroke-width="1.2" stroke-dasharray="6,3" filter="url(#cardShadow)"/>
+  <rect x="180" y="511" width="608" height="18" rx="5" fill="#B45309"/>
+  <rect x="180" y="521" width="608" height="8" fill="#B45309"/>
+  <text x="484" y="524" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" font-weight="700" fill="white">AI CLIENTS  (HTTP/REST Bridge → Python :8000)</text>
+
+  <rect x="190" y="536" width="200" height="18" rx="4" fill="white" stroke="#FCA5A5" stroke-width="1"/>
+  <text x="290" y="549" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#92400E">PythonMainframeAiAgentService</text>
+
+  <rect x="398" y="536" width="184" height="18" rx="4" fill="white" stroke="#FCA5A5" stroke-width="1"/>
+  <text x="490" y="549" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#92400E">PythonSemanticMappingClient</text>
+
+  <rect x="590" y="536" width="190" height="18" rx="4" fill="white" stroke="#FCA5A5" stroke-width="1"/>
+  <text x="685" y="549" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#92400E">AI Confidence Validators</text>
+
+  <!-- HTTP arrow label -->
+  <rect x="280" y="562" width="220" height="20" rx="10" fill="#FEF3C7" stroke="#F59E0B" stroke-width="1"/>
+  <text x="390" y="576" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="600" fill="#78350F">HTTP POST  ·  JSON  ·  Timeout 360s</text>
+
+  <text x="190" y="598" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#78350F">Payload: jobId · promptType · cobolContent · jclContent ·</text>
+  <text x="190" y="611" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#78350F">fieldMappings · reconChecks · sourceDatasets · expectedRecordCount</text>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       C# TIER — INFRASTRUCTURE  y=621..864
+  ═══════════════════════════════════════════════════════════════ -->
+  <rect x="180" y="621" width="608" height="244" rx="7" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1" filter="url(#cardShadow)"/>
+  <rect x="180" y="621" width="608" height="18" rx="5" fill="#475569"/>
+  <rect x="180" y="631" width="608" height="8" fill="#475569"/>
+  <text x="484" y="634" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" font-weight="700" fill="white">INFRASTRUCTURE &amp; CROSS-CUTTING</text>
+
+  <!-- Workflow Orchestrator -->
+  <rect x="190" y="646" width="280" height="55" rx="5" fill="white" stroke="#94A3B8" stroke-width="1"/>
+  <text x="330" y="661" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="600" fill="#0F172A">WorkflowOrchestratorService</text>
+  <text x="330" y="677" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#475569">Manages step sequencing &amp; state</text>
+  <text x="330" y="690" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#475569">Replay / resume workflows</text>
+
+  <!-- Artifact Persistence -->
+  <rect x="480" y="646" width="298" height="55" rx="5" fill="white" stroke="#94A3B8" stroke-width="1"/>
+  <text x="629" y="661" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="600" fill="#0F172A">ArtifactPersistenceService</text>
+  <text x="629" y="677" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#475569">JSON artifact read/write</text>
+  <text x="629" y="690" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#475569">final_mapping_config · value_mappings · target_metadata</text>
+
+  <!-- Transformation Infrastructure -->
+  <rect x="190" y="709" width="588" height="55" rx="5" fill="white" stroke="#94A3B8" stroke-width="1"/>
+  <text x="484" y="724" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="600" fill="#0F172A">Transformation Strategies (Strategy Pattern)</text>
+  <text x="280" y="740" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#475569">DateFormatting</text>
+  <text x="380" y="740" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#475569">DecimalFormatting</text>
+  <text x="490" y="740" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#475569">ValueMapping</text>
+  <text x="585" y="740" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#475569">Masking</text>
+  <text x="670" y="740" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#475569">FixedWidth</text>
+
+  <!-- Middleware -->
+  <rect x="190" y="772" width="280" height="55" rx="5" fill="white" stroke="#94A3B8" stroke-width="1"/>
+  <text x="330" y="787" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="600" fill="#0F172A">Middleware</text>
+  <text x="330" y="803" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#475569">Exception Handler · Serilog Logging</text>
+  <text x="330" y="816" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#475569">Antiforgery · DI Container (IServiceCollection)</text>
+
+  <!-- Config -->
+  <rect x="480" y="772" width="298" height="55" rx="5" fill="white" stroke="#94A3B8" stroke-width="1"/>
+  <text x="629" y="787" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="600" fill="#0F172A">Configuration</text>
+  <text x="629" y="803" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#475569">appsettings.json  ·  appsettings.Development.json</text>
+  <text x="629" y="816" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#475569">AI · PythonService · TimeoutSeconds · WorkflowStorage</text>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       PYTHON TIER — API ROUTES  y=118..215
+  ═══════════════════════════════════════════════════════════════ -->
+  <rect x="822" y="118" width="496" height="98" rx="7" fill="#DCFCE7" stroke="#4ADE80" stroke-width="1" filter="url(#cardShadow)"/>
+  <rect x="822" y="118" width="496" height="18" rx="5" fill="#166534"/>
+  <rect x="822" y="128" width="496" height="8" fill="#166534"/>
+  <text x="1070" y="131" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" font-weight="700" fill="white">FastAPI ROUTERS</text>
+
+  <!-- API route pills -->
+  <rect x="832" y="143" width="192" height="18" rx="4" fill="white" stroke="#4ADE80" stroke-width="1"/>
+  <text x="928" y="156" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#14532D">/api/mainframe/* (12 endpoints)</text>
+
+  <rect x="1032" y="143" width="146" height="18" rx="4" fill="white" stroke="#4ADE80" stroke-width="1"/>
+  <text x="1105" y="156" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#14532D">/api/semantic-mapping</text>
+
+  <rect x="1186" y="143" width="124" height="18" rx="4" fill="white" stroke="#4ADE80" stroke-width="1"/>
+  <text x="1248" y="156" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#14532D">/api/rule-inference</text>
+
+  <rect x="832" y="167" width="126" height="18" rx="4" fill="white" stroke="#4ADE80" stroke-width="1"/>
+  <text x="895" y="180" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#14532D">/api/vector-store</text>
+
+  <rect x="966" y="167" width="148" height="18" rx="4" fill="white" stroke="#4ADE80" stroke-width="1"/>
+  <text x="1040" y="180" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#14532D">/api/semantic-enrichment</text>
+
+  <rect x="1122" y="167" width="100" height="18" rx="4" fill="white" stroke="#4ADE80" stroke-width="1"/>
+  <text x="1172" y="180" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#14532D">/api/health</text>
+
+  <rect x="1230" y="167" width="80" height="18" rx="4" fill="white" stroke="#4ADE80" stroke-width="1"/>
+  <text x="1270" y="180" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#14532D">/api/ping</text>
+
+  <!-- Middleware pills row -->
+  <rect x="832" y="191" width="110" height="18" rx="4" fill="#FEF9C3" stroke="#EAB308" stroke-width="1"/>
+  <text x="887" y="204" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#713F12">Logging MW</text>
+  <rect x="950" y="191" width="110" height="18" rx="4" fill="#FEF9C3" stroke="#EAB308" stroke-width="1"/>
+  <text x="1005" y="204" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#713F12">Auth MW</text>
+  <rect x="1068" y="191" width="136" height="18" rx="4" fill="#FEF9C3" stroke="#EAB308" stroke-width="1"/>
+  <text x="1136" y="204" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#713F12">Exception Handler</text>
+  <rect x="1212" y="191" width="98" height="18" rx="4" fill="#FEF9C3" stroke="#EAB308" stroke-width="1"/>
+  <text x="1261" y="204" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#713F12">CORS MW</text>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       PYTHON TIER — APPLICATION SERVICES  y=226..380
+  ═══════════════════════════════════════════════════════════════ -->
+  <rect x="822" y="226" width="496" height="154" rx="7" fill="#F0FDF4" stroke="#86EFAC" stroke-width="1" filter="url(#cardShadow)"/>
+  <rect x="822" y="226" width="496" height="18" rx="5" fill="#166534"/>
+  <rect x="822" y="236" width="496" height="8" fill="#166534"/>
+  <text x="1070" y="239" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" font-weight="700" fill="white">APPLICATION SERVICES</text>
+
+  <!-- MainframeAgentService - large feature box -->
+  <rect x="832" y="251" width="232" height="120" rx="5" fill="white" stroke="#22C55E" stroke-width="1.2"/>
+  <rect x="832" y="251" width="232" height="16" rx="4" fill="#166534"/>
+  <text x="948" y="263" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" font-weight="700" fill="white">MainframeAgentService</text>
+  <text x="848" y="279" font-family="Segoe UI,Arial,sans-serif" font-size="7.5" fill="#14532D">Advisory Agents (max_tokens=4000):</text>
+  <text x="848" y="292" font-family="Segoe UI,Arial,sans-serif" font-size="7.5" fill="#14532D">  explain · review · enhance · validation</text>
+  <text x="848" y="305" font-family="Segoe UI,Arial,sans-serif" font-size="7.5" fill="#14532D">  error_handling · documentation</text>
+  <text x="848" y="318" font-family="Segoe UI,Arial,sans-serif" font-size="7.5" fill="#14532D">  jcl_improvements · optimization</text>
+  <text x="848" y="333" font-family="Segoe UI,Arial,sans-serif" font-size="7.5" fill="#14532D">Code-Gen Agents (max_tokens=16000):</text>
+  <text x="848" y="346" font-family="Segoe UI,Arial,sans-serif" font-size="7.5" fill="#14532D">  generate_cobol · generate_jcl</text>
+  <text x="848" y="359" font-family="Segoe UI,Arial,sans-serif" font-size="7.5" fill="#14532D">  generate_recon_cobol · generate_recon_jcl</text>
+
+  <!-- Other services -->
+  <rect x="1072" y="251" width="232" height="26" rx="4" fill="white" stroke="#86EFAC" stroke-width="1"/>
+  <text x="1188" y="268" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#14532D">SemanticMappingService</text>
+
+  <rect x="1072" y="283" width="232" height="26" rx="4" fill="white" stroke="#86EFAC" stroke-width="1"/>
+  <text x="1188" y="300" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#14532D">SemanticEnrichmentService</text>
+
+  <rect x="1072" y="315" width="232" height="26" rx="4" fill="white" stroke="#86EFAC" stroke-width="1"/>
+  <text x="1188" y="332" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#14532D">RuleInferenceService</text>
+
+  <rect x="1072" y="347" width="112" height="26" rx="4" fill="white" stroke="#86EFAC" stroke-width="1"/>
+  <text x="1128" y="364" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#14532D">VectorStoreService</text>
+
+  <rect x="1192" y="347" width="112" height="26" rx="4" fill="white" stroke="#86EFAC" stroke-width="1"/>
+  <text x="1248" y="364" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#14532D">MultiSourceSchemaService</text>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       PYTHON TIER — AI INFRASTRUCTURE  y=392..530
+  ═══════════════════════════════════════════════════════════════ -->
+  <rect x="822" y="392" width="496" height="138" rx="7" fill="#F0F9FF" stroke="#7DD3FC" stroke-width="1" filter="url(#cardShadow)"/>
+  <rect x="822" y="392" width="496" height="18" rx="5" fill="#075985"/>
+  <rect x="822" y="402" width="496" height="8" fill="#075985"/>
+  <text x="1070" y="405" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" font-weight="700" fill="white">AI INFRASTRUCTURE</text>
+
+  <rect x="832" y="417" width="152" height="38" rx="4" fill="white" stroke="#7DD3FC" stroke-width="1"/>
+  <text x="908" y="431" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" font-weight="600" fill="#0C4A6E">LLMProviderFactory</text>
+  <text x="908" y="447" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="7.5" fill="#0C4A6E">Per-task provider routing</text>
+
+  <rect x="992" y="417" width="152" height="38" rx="4" fill="white" stroke="#7DD3FC" stroke-width="1"/>
+  <text x="1068" y="431" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" font-weight="600" fill="#0C4A6E">EmbeddingService</text>
+  <text x="1068" y="447" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="7.5" fill="#0C4A6E">Azure OpenAI text-embedding-3-small</text>
+
+  <rect x="1152" y="417" width="158" height="38" rx="4" fill="white" stroke="#7DD3FC" stroke-width="1"/>
+  <text x="1231" y="431" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" font-weight="600" fill="#0C4A6E">SemanticRetrieverService</text>
+  <text x="1231" y="447" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="7.5" fill="#0C4A6E">RAG — top-k ChromaDB lookup</text>
+
+  <rect x="832" y="461" width="152" height="38" rx="4" fill="white" stroke="#7DD3FC" stroke-width="1"/>
+  <text x="908" y="475" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" font-weight="600" fill="#0C4A6E">PromptManager</text>
+  <text x="908" y="491" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="7.5" fill="#0C4A6E">YAML prompt templates (20 files)</text>
+
+  <rect x="992" y="461" width="152" height="38" rx="4" fill="white" stroke="#7DD3FC" stroke-width="1"/>
+  <text x="1068" y="475" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" font-weight="600" fill="#0C4A6E">BudgetTrackingProvider</text>
+  <text x="1068" y="491" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="7.5" fill="#0C4A6E">Token cost audit &amp; logging</text>
+
+  <rect x="1152" y="461" width="158" height="38" rx="4" fill="white" stroke="#7DD3FC" stroke-width="1"/>
+  <text x="1231" y="475" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" font-weight="600" fill="#0C4A6E">AIResponseValidator</text>
+  <text x="1231" y="491" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="7.5" fill="#0C4A6E">Confidence gating &amp; hallucination guard</text>
+
+  <rect x="832" y="505" width="478" height="20" rx="4" fill="#FEF9C3" stroke="#EAB308" stroke-width="1"/>
+  <text x="1071" y="519" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#713F12">SemanticCache (in-memory) · 4-pass JSON repair · _escape_json_strings · loguru structured logging</text>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       PYTHON TIER — LLM PROVIDERS  y=542..640
+  ═══════════════════════════════════════════════════════════════ -->
+  <rect x="822" y="542" width="496" height="98" rx="7" fill="#FEF2F2" stroke="#FCA5A5" stroke-width="1" filter="url(#cardShadow)"/>
+  <rect x="822" y="542" width="496" height="18" rx="5" fill="#991B1B"/>
+  <rect x="822" y="552" width="496" height="8" fill="#991B1B"/>
+  <text x="1070" y="555" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" font-weight="700" fill="white">LLM PROVIDERS  (pluggable via LLM_PROVIDER env var)</text>
+
+  <rect x="832" y="567" width="140" height="38" rx="4" fill="white" stroke="#FCA5A5" stroke-width="1"/>
+  <text x="902" y="581" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" font-weight="600" fill="#7F1D1D">ClaudeProvider</text>
+  <text x="902" y="597" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="7.5" fill="#7F1D1D">claude-sonnet-4-6</text>
+
+  <rect x="980" y="567" width="140" height="38" rx="4" fill="white" stroke="#FCA5A5" stroke-width="1"/>
+  <text x="1050" y="581" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" font-weight="600" fill="#7F1D1D">AzureOpenAIProvider</text>
+  <text x="1050" y="597" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="7.5" fill="#7F1D1D">gpt-4o-mini / gpt-4o</text>
+
+  <rect x="832" y="611" width="96" height="24" rx="4" fill="white" stroke="#FCA5A5" stroke-width="1"/>
+  <text x="880" y="627" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#7F1D1D">GeminiProvider</text>
+
+  <rect x="936" y="611" width="96" height="24" rx="4" fill="white" stroke="#FCA5A5" stroke-width="1"/>
+  <text x="984" y="627" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#7F1D1D">OllamaProvider</text>
+
+  <rect x="1040" y="611" width="96" height="24" rx="4" fill="white" stroke="#FCA5A5" stroke-width="1"/>
+  <text x="1088" y="627" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#7F1D1D">MistralProvider</text>
+
+  <!-- common badge -->
+  <rect x="1144" y="567" width="166" height="68" rx="4" fill="#FEF9C3" stroke="#EAB308" stroke-width="1"/>
+  <text x="1227" y="583" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" font-weight="600" fill="#713F12">ILLMProvider Interface</text>
+  <text x="1227" y="598" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="7.5" fill="#713F12">complete(system, user,</text>
+  <text x="1227" y="611" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="7.5" fill="#713F12">  max_tokens, temperature)</text>
+  <text x="1227" y="624" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="7.5" fill="#713F12">health_check() → bool</text>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       PYTHON TIER — VECTOR STORE &amp; PROMPTS  y=652..864
+  ═══════════════════════════════════════════════════════════════ -->
+  <rect x="822" y="652" width="496" height="212" rx="7" fill="#F5F3FF" stroke="#C4B5FD" stroke-width="1" filter="url(#cardShadow)"/>
+  <rect x="822" y="652" width="496" height="18" rx="5" fill="#5B21B6"/>
+  <rect x="822" y="662" width="496" height="8" fill="#5B21B6"/>
+  <text x="1070" y="665" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9.5" font-weight="700" fill="white">VECTOR STORE &amp; PROMPT TEMPLATES</text>
+
+  <!-- ChromaDB box -->
+  <rect x="832" y="677" width="230" height="80" rx="5" fill="white" stroke="#C4B5FD" stroke-width="1"/>
+  <text x="947" y="692" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="600" fill="#3B0764">ChromaDB  (local, persistent)</text>
+  <text x="947" y="707" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#4C1D95">Collections:</text>
+  <text x="947" y="720" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#4C1D95">  MAINFRAME_PATTERNS  ·  FIELD_MAPPINGS</text>
+  <text x="947" y="733" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#4C1D95">  Embedding: text-embedding-3-small</text>
+  <text x="947" y="746" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#4C1D95">  ./data/chromadb/ (local FS)</text>
+
+  <!-- Prompt YAMLs box -->
+  <rect x="1070" y="677" width="240" height="80" rx="5" fill="white" stroke="#C4B5FD" stroke-width="1"/>
+  <text x="1190" y="692" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="600" fill="#3B0764">Prompt YAML Templates</text>
+  <text x="1190" y="707" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#4C1D95">mainframe_generate_cobol_v1</text>
+  <text x="1190" y="720" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#4C1D95">mainframe_generate_jcl_v1</text>
+  <text x="1190" y="733" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#4C1D95">mainframe_generate_recon_cobol_v1</text>
+  <text x="1190" y="746" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#4C1D95">mainframe_generate_recon_jcl_v1  + 8 advisory</text>
+
+  <!-- Config YAML -->
+  <rect x="832" y="765" width="478" height="88" rx="5" fill="white" stroke="#C4B5FD" stroke-width="1"/>
+  <text x="1071" y="780" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="600" fill="#3B0764">models.yaml  —  Per-Task AI Configuration</text>
+  <text x="850" y="796" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#4C1D95">mainframe_agent:  provider=claude · model=claude-sonnet-4-6 · max_tokens=16000 · request_timeout=300</text>
+  <text x="850" y="811" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#4C1D95">semantic_mapping:  model=claude-haiku-4-5-20251001 · max_tokens=2000 · request_timeout=60</text>
+  <text x="850" y="826" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#4C1D95">schema_enrichment / rule_inference:  max_tokens=1000 · LLM_PROVIDER=claude (env var override)</text>
+  <text x="850" y="841" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#4C1D95">Embedding:  text-embedding-3-small · dimensions=1536 · EMBEDDING_PROVIDER=azure_openai</text>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       EXTERNAL APIs
+  ═══════════════════════════════════════════════════════════════ -->
+
+  <!-- Anthropic -->
+  <rect x="1348" y="118" width="242" height="66" rx="6" fill="white" stroke="#F97316" stroke-width="1.2" filter="url(#cardShadow)"/>
+  <rect x="1348" y="118" width="242" height="18" rx="5" fill="#B45309"/>
+  <text x="1469" y="131" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="700" fill="white">🤖 Anthropic API</text>
+  <text x="1469" y="151" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#7C2D12">api.anthropic.com/v1/messages</text>
+  <text x="1469" y="166" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#7C2D12">claude-sonnet-4-6  ·  max_tokens=16000</text>
+  <text x="1469" y="178" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#9A3412">ANTHROPIC_API_KEY</text>
+
+  <!-- Azure OpenAI -->
+  <rect x="1348" y="198" width="242" height="66" rx="6" fill="white" stroke="#F97316" stroke-width="1.2" filter="url(#cardShadow)"/>
+  <rect x="1348" y="198" width="242" height="18" rx="5" fill="#0369A1"/>
+  <text x="1469" y="211" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="700" fill="white">☁ Azure OpenAI API</text>
+  <text x="1469" y="231" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#0C4A6E">{endpoint}/openai/deployments/</text>
+  <text x="1469" y="246" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#0C4A6E">gpt-4o-mini  ·  api-version 2024-02-15</text>
+  <text x="1469" y="258" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#075985">AZURE_OPENAI_API_KEY + ENDPOINT</text>
+
+  <!-- Gemini -->
+  <rect x="1348" y="278" width="242" height="56" rx="6" fill="white" stroke="#F97316" stroke-width="1.2" filter="url(#cardShadow)"/>
+  <rect x="1348" y="278" width="242" height="18" rx="5" fill="#065F46"/>
+  <text x="1469" y="291" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="700" fill="white">🔷 Google Gemini API</text>
+  <text x="1469" y="311" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#064E3B">generativelanguage.googleapis.com</text>
+  <text x="1469" y="326" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#064E3B">GEMINI_API_KEY</text>
+
+  <!-- Mistral -->
+  <rect x="1348" y="348" width="242" height="56" rx="6" fill="white" stroke="#F97316" stroke-width="1.2" filter="url(#cardShadow)"/>
+  <rect x="1348" y="348" width="242" height="18" rx="5" fill="#6B21A8"/>
+  <text x="1469" y="361" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="700" fill="white">🌀 Mistral API</text>
+  <text x="1469" y="381" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#4A044E">api.mistral.ai/v1</text>
+  <text x="1469" y="396" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#4A044E">MISTRAL_API_KEY</text>
+
+  <!-- Ollama -->
+  <rect x="1348" y="418" width="242" height="56" rx="6" fill="white" stroke="#F97316" stroke-width="1.2" filter="url(#cardShadow)"/>
+  <rect x="1348" y="418" width="242" height="18" rx="5" fill="#374151"/>
+  <text x="1469" y="431" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="700" fill="white">🦙 Ollama  (local)</text>
+  <text x="1469" y="451" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#1F2937">localhost:11434</text>
+  <text x="1469" y="466" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#1F2937">llama3 / any local model</text>
+
+  <!-- Provider switch note -->
+  <rect x="1348" y="490" width="242" height="52" rx="6" fill="#FEF9C3" stroke="#EAB308" stroke-width="1.2"/>
+  <text x="1469" y="507" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" font-weight="700" fill="#713F12">Provider Switch</text>
+  <text x="1469" y="522" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#78350F">LLM_PROVIDER=claude|azure_openai</text>
+  <text x="1469" y="536" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#78350F">|gemini|mistral|ollama (.env)</text>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       STORAGE ROW  y=880..990
+  ═══════════════════════════════════════════════════════════════ -->
+  <rect x="18" y="882" width="1580" height="130" rx="10" fill="url(#storeGrad)" stroke="#94A3B8" stroke-width="1.5" filter="url(#colShadow)"/>
+  <rect x="18" y="882" width="1580" height="26" rx="8" fill="#334155"/>
+  <rect x="18" y="898" width="1580" height="10" fill="#334155"/>
+  <text x="810" y="900" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="white">STORAGE  &amp;  PERSISTENCE LAYER</text>
+
+  <!-- SQLite -->
+  <rect x="30" y="916" width="248" height="86" rx="6" fill="white" stroke="#94A3B8" stroke-width="1" filter="url(#cardShadow)"/>
+  <text x="154" y="932" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#0F172A">🗃 SQLite Database</text>
+  <text x="154" y="950" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#475569">datareconciliation.db (prod)</text>
+  <text x="154" y="965" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#475569">datareconciliation_dev.db (dev)</text>
+  <text x="154" y="980" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#64748B">Workflow state · Job records · Settings</text>
+  <text x="154" y="995" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#64748B">DataReconciliation/Infrastructure/Persistence</text>
+
+  <!-- Workflow File System -->
+  <rect x="288" y="916" width="530" height="86" rx="6" fill="white" stroke="#94A3B8" stroke-width="1" filter="url(#cardShadow)"/>
+  <text x="553" y="932" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#0F172A">📁 Workflow File System  (JSON Artifacts)</text>
+  <text x="553" y="950" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#475569">workflow/{jobId}/  ·  sources/ · reports/ · mainframe-assets/ · mainframe/</text>
+  <text x="360" y="966" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#64748B">source_files.csv</text>
+  <text x="460" y="966" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#64748B">final_mapping_config.json</text>
+  <text x="600" y="966" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#64748B">value_mappings.json</text>
+  <text x="710" y="966" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#64748B">reconciliation_result.json</text>
+  <text x="360" y="981" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#64748B">target_metadata_profile.json</text>
+  <text x="510" y="981" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#64748B">*.cbl  ·  *.jcl  ·  *.cpy</text>
+  <text x="640" y="981" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#64748B">recon_*.cbl  ·  recon_*.jcl</text>
+  <text x="360" y="996" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#64748B">transformation_rules.json</text>
+  <text x="510" y="996" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#64748B">target_*.dat (fixed-width output)</text>
+
+  <!-- ChromaDB storage -->
+  <rect x="828" y="916" width="338" height="86" rx="6" fill="white" stroke="#94A3B8" stroke-width="1" filter="url(#cardShadow)"/>
+  <text x="997" y="932" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#0F172A">🔍 ChromaDB  (Vector Store)</text>
+  <text x="997" y="950" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#475569">AISemanticMapping/data/chromadb/  (local persistent)</text>
+  <text x="997" y="965" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#475569">Collection: MAINFRAME_PATTERNS</text>
+  <text x="997" y="980" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#475569">Collection: FIELD_MAPPINGS</text>
+  <text x="997" y="995" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#64748B">Cosine similarity · top-k retrieval · RAG context for prompts</text>
+
+  <!-- Python Logs -->
+  <rect x="1176" y="916" width="230" height="86" rx="6" fill="white" stroke="#94A3B8" stroke-width="1" filter="url(#cardShadow)"/>
+  <text x="1291" y="932" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#0F172A">📋 Log Files</text>
+  <text x="1291" y="950" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#475569">C#:  DataReconciliation/logs/  (Serilog)</text>
+  <text x="1291" y="965" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#475569">Python:  python_logs/errors.log  (loguru)</text>
+  <text x="1291" y="980" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8.5" fill="#475569">Budget:  budget_tracker.log</text>
+  <text x="1291" y="995" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#64748B">Structured JSON · correlation IDs · token usage</text>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       FLOW ARROWS
+  ═══════════════════════════════════════════════════════════════ -->
+
+  <!-- User → C# (HTTP GET/POST Razor) -->
+  <line x1="158" y1="185" x2="168" y2="185" stroke="#7C3AED" stroke-width="2" marker-end="url(#aPurple)"/>
+  <text x="163" y="179" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="7" fill="#6D28D9">HTTP</text>
+
+  <!-- C# AI Clients → Python (HTTP REST arrow across columns) -->
+  <line x1="788" y1="572" x2="810" y2="572" stroke="#EA580C" stroke-width="2.5" marker-end="url(#aOrange)"/>
+  <text x="799" y="566" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="7" fill="#C2410C">REST</text>
+
+  <!-- Python → Anthropic -->
+  <line x1="1318" y1="590" x2="1346" y2="151" stroke="#B45309" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#aOrange)"/>
+
+  <!-- Python → Azure OpenAI -->
+  <line x1="1120" y1="580" x2="1346" y2="231" stroke="#0369A1" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#aOrange)"/>
+
+  <!-- Python → Gemini -->
+  <line x1="1318" y1="600" x2="1346" y2="306" stroke="#065F46" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#aOrange)"/>
+
+  <!-- Python → Mistral -->
+  <line x1="1318" y1="612" x2="1346" y2="376" stroke="#6B21A8" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#aOrange)"/>
+
+  <!-- Python → Ollama -->
+  <line x1="1318" y1="622" x2="1346" y2="446" stroke="#374151" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#aOrange)"/>
+
+  <!-- C# → SQLite (down to storage) -->
+  <line x1="280" y1="865" x2="154" y2="882" stroke="#64748B" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#aGray)"/>
+
+  <!-- C# → File System -->
+  <line x1="484" y1="865" x2="553" y2="882" stroke="#64748B" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#aGray)"/>
+
+  <!-- Python → ChromaDB storage -->
+  <line x1="1070" y1="865" x2="997" y2="882" stroke="#7C3AED" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#aPurple)"/>
+
+  <!-- RAG retrieval arrow (Python infra → ChromaDB) -->
+  <line x1="1010" y1="460" x2="997" y2="916" stroke="#7C3AED" stroke-width="1" stroke-dasharray="3,4" opacity="0.4" marker-end="url(#aPurple)"/>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       LEGEND / FOOTER
+  ═══════════════════════════════════════════════════════════════ -->
+  <rect x="18" y="1020" width="1580" height="14" rx="4" fill="#E2E8F0"/>
+  <text x="810" y="1031" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#475569">
+    DataReconciliation Platform  ·  Architecture Diagram  ·  Generated 2026-07-01  ·  ranjith03443
+  </text>
+
+  <!-- Legend items -->
+  <line x1="30" y1="1036" x2="55" y2="1036" stroke="#7C3AED" stroke-width="2" marker-end="url(#aPurple)"/>
+  <text x="58" y="1038" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#475569">HTTP (browser)</text>
+
+  <line x1="150" y1="1036" x2="175" y2="1036" stroke="#EA580C" stroke-width="2" marker-end="url(#aOrange)"/>
+  <text x="178" y="1038" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#475569">HTTP REST (C# → Python)</text>
+
+  <line x1="310" y1="1036" x2="335" y2="1036" stroke="#B45309" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#aOrange)"/>
+  <text x="338" y="1038" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#475569">HTTPS (Python → LLM API)</text>
+
+  <line x1="480" y1="1036" x2="505" y2="1036" stroke="#64748B" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#aGray)"/>
+  <text x="508" y="1038" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#475569">Storage read/write</text>
+
+</svg>

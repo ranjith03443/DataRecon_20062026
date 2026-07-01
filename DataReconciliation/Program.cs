@@ -133,6 +133,7 @@ builder.Services.AddScoped<ITargetMetadataExtractionService, TargetMetadataExtra
 builder.Services.AddScoped<ITargetSchemaGeneratorService, TargetSchemaGeneratorService>();
 builder.Services.AddScoped<IMainframeArtifactGenerationService, MainframeArtifactGenerationService>();
 builder.Services.AddScoped<IMainframeAssetGenerationService, MainframeAssetGenerationService>();
+builder.Services.AddScoped<IReconProgramGenerationService, ReconProgramGenerationService>();
 builder.Services.AddHttpClient<IMainframeAiAgentService, PythonMainframeAiAgentService>(client =>
 {
     var baseUrl = builder.Configuration["AI:PythonService:BaseUrl"] ?? "http://localhost:8000";
