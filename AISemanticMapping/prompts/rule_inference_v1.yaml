@@ -11,7 +11,7 @@ system_prompt: |
   Always respond with valid JSON only. Do not include any markdown, explanation outside JSON, or commentary.
 
 user_prompt_template: |
-  Interpret the following business rule and infer the technical transformation operation.
+  Interpret the following business rule and infer the correct transformation operation.
 
   BUSINESS RULE: {rule_description}
   FIELD CONTEXT: {field_context}
@@ -19,10 +19,31 @@ user_prompt_template: |
   RETRIEVED SEMANTIC CONTEXT:
   {semantic_context}
 
+  SUPPORTED OPERATIONS — you MUST return the "operation" field as EXACTLY one of these strings.
+  No other values are valid. Choose the closest match:
+  {supported_operations}
+
+  Parameter hints per operation:
+  - DATE_FORMAT       → parameters: inputFormat (e.g. "MM/DD/YYYY"), outputFormat (e.g. "YYYYMMDD")
+  - DECIMAL_FORMAT    → parameters: decimalPlaces (int), stripDecimalSeparator ("true"/"false")
+  - MASK              → parameters: visibleStart (int), visibleEnd (int), maskChar ("*")
+  - PAD_LEFT          → parameters: totalLength (int), padChar (" " or "0")
+  - PAD_RIGHT         → parameters: totalLength (int), padChar (" ")
+  - TRUNCATE          → parameters: maxLength (int)
+  - VALUE_MAPPING     → parameters: map:SOURCE_VALUE = TARGET_VALUE (one entry per code pair)
+  - CONCAT            → parameters: fields (comma-separated field names), delimiter (" ")
+  - SPLIT             → parameters: delimiter, index (0-based)
+  - BOOLEAN_MAPPING   → parameters: trueValues, falseValues, trueOutput, falseOutput
+  - CURRENCY_NORMALIZATION → parameters: decimalPlaces (int)
+  - DEFAULT_VALUE     → parameters: value (the constant to use)
+  - NULL_REPLACEMENT  → parameters: value (the replacement when source is blank)
+  - FIXED_WIDTH_FORMAT → parameters: width (int), alignment ("LEFT"/"RIGHT"), padChar
+  - STRING_TO_NUMERIC, NUMERIC_TO_STRING, UPPERCASE, LOWERCASE, PROPERCASE, REMOVE_SPECIAL_CHARACTERS → no parameters needed
+
   Respond with this exact JSON structure:
   {{
-    "operation": "<transformation_operation_type>",
-    "format": "<format_string_if_applicable>",
+    "operation": "<one of the SUPPORTED OPERATIONS listed above>",
+    "format": "<format string if applicable, e.g. YYYYMMDD — otherwise omit>",
     "parameters": {{
       "<param_key>": "<param_value>"
     }},
@@ -32,11 +53,8 @@ user_prompt_template: |
       "<validation rule 2>"
     ],
     "confidence": <float between 0.0 and 1.0>,
-    "reasoning": "<brief explanation>"
+    "reasoning": "<brief explanation of why this operation was chosen>"
   }}
-
-  Common operation types: date_format, string_trim, numeric_round, currency_convert,
-  uppercase, lowercase, null_replace, prefix_add, suffix_add, regex_extract, conditional_map
 
 response_schema:
   type: object

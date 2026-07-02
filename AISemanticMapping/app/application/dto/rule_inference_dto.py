@@ -12,6 +12,10 @@ class RuleInferenceRequestDTO(BaseModel):
     jobId: Optional[str] = Field(None, description="Job ID for audit tracking")
     requestId: Optional[str] = Field(None, description="Request correlation ID")
     workflowStep: Optional[str] = Field(None, description="Workflow step")
+    supportedOperations: Optional[List[str]] = Field(
+        None,
+        description="Canonical operation names the C# execution engine accepts. AI must return exactly one of these."
+    )
 
 
 class RuleInferenceResponseDTO(BaseModel):

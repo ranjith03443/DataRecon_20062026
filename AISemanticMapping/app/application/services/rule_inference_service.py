@@ -116,12 +116,20 @@ class RuleInferenceService:
         prompt_version_tag = self._prompt_versioning.audit_prompt_usage(
             _PROMPT_ID, job_id=job_id, request_id=effective_request_id, workflow_step=workflow_step
         )
+        ops_list = request.supportedOperations or []
+        supported_ops_str = (
+            "\n".join(f"  - {op}" for op in ops_list)
+            if ops_list
+            else "  (not provided — use best judgement)"
+        )
+
         system_prompt = self._prompt_manager.render_system_prompt(_PROMPT_ID)
         user_prompt = self._prompt_manager.render_user_prompt(
             _PROMPT_ID,
             rule_description=sanitize_prompt(request.rule),
             field_context=sanitize_prompt(request.fieldContext or "N/A"),
             semantic_context=semantic_context,
+            supported_operations=supported_ops_str,
         )
 
         # LLM inference

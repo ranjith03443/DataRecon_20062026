@@ -1,4 +1,5 @@
 using DataReconciliation.Application.Interfaces;
+using DataReconciliation.Application.Transformations;
 using DataReconciliation.Domain.Models;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -13,14 +14,15 @@ namespace DataReconciliation.AI.Clients
     /// Python service contract — POST {BaseUrl}{RuleInferenceEndpoint}:
     ///   Request body:
     ///     {
-    ///       "rule":          "Convert date from MM/DD/YYYY to YYYYMMDD",
-    ///       "fieldContext":  "BIRTH_DATE",
-    ///       "jobId":         "JOB_20260525_ABC123",
-    ///       "workflowStep":  "TransformationExecution"
+    ///       "rule":                "Convert date from MM/DD/YYYY to YYYYMMDD",
+    ///       "fieldContext":        "BIRTH_DATE",
+    ///       "jobId":               "JOB_20260525_ABC123",
+    ///       "workflowStep":        "TransformationExecution",
+    ///       "supportedOperations": ["DATE_FORMAT","TRUNCATE","PAD_LEFT", ...]
     ///     }
     ///   Response body:
     ///     {
-    ///       "operation":       "DATE_FORMAT_CONVERSION",
+    ///       "operation":       "DATE_FORMAT",
     ///       "format":          "YYYYMMDD",
     ///       "parameters":      { "input_format": "MM/DD/YYYY", "output_format": "YYYYMMDD" },
     ///       "description":     "Convert date string from MM/DD/YYYY to YYYYMMDD format",
@@ -35,6 +37,7 @@ namespace DataReconciliation.AI.Clients
         private readonly HttpClient _httpClient;
         private readonly ILogger<PythonRuleInferenceService> _logger;
         private readonly IConfiguration _configuration;
+        private readonly ITransformationRegistryProvider _registry;
 
         // In-process cache: rule text → result, so the same rule is only inferred once per job
         private readonly Dictionary<string, RuleInferenceResult> _sessionCache = new(StringComparer.OrdinalIgnoreCase);
@@ -42,11 +45,13 @@ namespace DataReconciliation.AI.Clients
         public PythonRuleInferenceService(
             HttpClient httpClient,
             ILogger<PythonRuleInferenceService> logger,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            ITransformationRegistryProvider registry)
         {
             _httpClient = httpClient;
             _logger = logger;
             _configuration = configuration;
+            _registry = registry;
 
             var timeoutSec = _configuration.GetValue<int>("AI:PythonService:TimeoutSeconds", 30);
             _httpClient.Timeout = TimeSpan.FromSeconds(timeoutSec);
@@ -65,16 +70,20 @@ namespace DataReconciliation.AI.Clients
                 return cached;
             }
 
-            var baseUrl   = _configuration["AI:PythonService:BaseUrl"]             ?? "http://localhost:8000";
+            var baseUrl   = _configuration["AI:PythonService:BaseUrl"]               ?? "http://localhost:8000";
             var endpoint  = _configuration["AI:PythonService:RuleInferenceEndpoint"] ?? "/api/rule-inference";
             var fullUrl   = $"{baseUrl.TrimEnd('/')}{endpoint}";
+
+            // Attach the live registry so Python/AI is constrained to return only names the C# engine can execute
+            var registryOps = (await _registry.GetRegistryAsync()).Operations;
 
             var payload = new
             {
                 rule,
                 fieldContext,
                 jobId,
-                workflowStep
+                workflowStep,
+                supportedOperations = registryOps
             };
 
             var json    = JsonConvert.SerializeObject(payload);
