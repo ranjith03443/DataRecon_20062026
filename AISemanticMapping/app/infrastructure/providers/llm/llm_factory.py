@@ -42,6 +42,19 @@ class LLMProviderFactory:
         task_provider = model_config.get("provider") if model_config else None
         provider_name = (provider_override or task_provider or config.llm_provider).lower()
 
+        # Auto-fallback: if a task requests azure_openai but no endpoint is configured
+        # (e.g. running on a machine that only has Anthropic/Claude credentials),
+        # transparently fall back to the global llm_provider so the service still works.
+        if provider_name == LLMProviderType.AZURE_OPENAI and not config.azure_openai_endpoint:
+            fallback = config.llm_provider.lower()
+            logger.warning(
+                f"[LLMProviderFactory] Azure OpenAI endpoint not configured — "
+                f"falling back to '{fallback}' | task={task}",
+                category=LogCategories.LLM_CALL,
+            )
+            provider_name = fallback
+            model_config = None   # let the fallback provider use its own default config
+
         logger.info(
             f"[LLMProviderFactory] Creating provider | provider={provider_name} | task={task}",
             category=LogCategories.LLM_CALL,
