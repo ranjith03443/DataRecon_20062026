@@ -8,7 +8,6 @@ using DataReconciliation.Infrastructure.Caching;
 using DataReconciliation.Infrastructure.FileStorage;
 using DataReconciliation.Infrastructure.Persistence;
 using DataReconciliation.Infrastructure.Repositories;
-using DataReconciliation.Infrastructure.TransformationStrategies;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using Serilog.Events;
@@ -95,19 +94,6 @@ else
     Console.WriteLine("[AI] Provider = OpenAI");
 }
 
-// ─── Transformation Strategies (Strategy Pattern) ────────────────────────────
-builder.Services.AddSingleton<ITransformationStrategy, DateFormattingStrategy>();
-builder.Services.AddSingleton<ITransformationStrategy, DecimalFormattingStrategy>();
-builder.Services.AddSingleton<ITransformationStrategy, MaskingStrategy>();
-builder.Services.AddSingleton<ITransformationStrategy, ValueMappingStrategy>();
-builder.Services.AddSingleton<ITransformationStrategy, HardcodedValueStrategy>();
-builder.Services.AddSingleton<ITransformationStrategy, FixedWidthFormattingStrategy>();
-builder.Services.AddSingleton<ITransformationStrategy, DatatypeConversionStrategy>();
-builder.Services.AddSingleton<ITransformationStrategy, DefaultValueAssignmentStrategy>();
-builder.Services.AddSingleton<ITransformationStrategy, UpperCaseStrategy>();
-builder.Services.AddSingleton<ITransformationStrategy, TrimStrategy>();
-builder.Services.AddSingleton<ITransformationStrategy, DateFormatConversionStrategy>(); // AI-inferred
-builder.Services.AddSingleton<TransformationStrategyFactory>();
 
 // ─── Python AI Rule Inference (Step 11) ──────────────────────────────────────
 if (aiProvider.Equals("PythonService", StringComparison.OrdinalIgnoreCase))

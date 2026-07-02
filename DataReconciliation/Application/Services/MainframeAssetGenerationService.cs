@@ -2,6 +2,7 @@ using DataReconciliation.Application.DTOs;
 using DataReconciliation.Application.Interfaces;
 using DataReconciliation.Domain.Enums;
 using DataReconciliation.Domain.Models;
+using DataReconciliation.Domain.Transformations;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System.Text;
@@ -119,6 +120,43 @@ namespace DataReconciliation.Application.Services
                 Fields = fields
             };
 
+            // ── Pre-load transformation rules for AI context ──────────────────
+            // transformation_rules.json is written by TransformationExecutionService;
+            // may not exist if the transformation step hasn't run yet (non-fatal).
+            var trArtifact = await _artifactPersistence.LoadArtifactByNameAsync<TransformationRulesArtifact>(
+                jobId, "transformation_rules.json");
+            var trRulesList = trArtifact?.Rules?.Select(r => new Dictionary<string, object?>
+            {
+                { "sourceField", r.SourceField },
+                { "targetField", r.TargetField },
+                { "operation",   r.Operation   },
+                { "parameters",  r.Parameters  },
+                { "confidence",  r.Confidence  },
+            }).ToList<Dictionary<string, object?>>();
+
+            // ── Pre-launch AI generation tasks in parallel ────────────────────
+            // COBOL and JCL AI calls are independent — run simultaneously to
+            // eliminate sequential wait (each call can take 10-30 s on Azure OpenAI).
+            var cobolAiTask = (request.UseAiMode && request.GenerateCobolSkeleton)
+                ? _aiAgent.RunAgentAsync(BuildAiRequest(
+                    jobId, "generate_cobol", safePgm, safeRecord, safeJob,
+                    position - 1, fields, finalMapping, valueMappings, trRulesList))
+                : null;
+            var jclAiTask = (request.UseAiMode && request.GenerateJclSkeleton)
+                ? _aiAgent.RunAgentAsync(BuildAiRequest(
+                    jobId, "generate_jcl", safePgm, safeRecord, safeJob,
+                    position - 1, fields, finalMapping, valueMappings, trRulesList))
+                : null;
+
+            if (cobolAiTask != null && jclAiTask != null)
+            {
+                _logger.LogInformation(
+                    "AI Mode: awaiting COBOL + JCL generation in parallel. JobId={JobId}", jobId);
+                await Task.WhenAll(cobolAiTask, jclAiTask);
+            }
+            else if (cobolAiTask != null) await cobolAiTask;
+            else if (jclAiTask  != null) await jclAiTask;
+
             // ── Generate requested assets ─────────────────────────────────────
             if (request.GenerateCopybook)
             {
@@ -137,11 +175,7 @@ namespace DataReconciliation.Application.Services
                 string cobolContent;
                 if (request.UseAiMode)
                 {
-                    _logger.LogInformation("AI Mode: generating COBOL program. JobId={JobId}", jobId);
-                    var aiRequest = BuildAiRequest(
-                        jobId, "generate_cobol", safePgm, safeRecord, safeJob,
-                        position - 1, fields, finalMapping, valueMappings);
-                    var aiResult = await _aiAgent.RunAgentAsync(aiRequest);
+                    var aiResult = await cobolAiTask!;
                     if (aiResult == null || string.IsNullOrWhiteSpace(aiResult.GeneratedCode))
                         throw new InvalidOperationException(
                             "AI service did not return a COBOL program. " +
@@ -155,7 +189,7 @@ namespace DataReconciliation.Application.Services
                 }
                 else
                 {
-                    cobolContent = BuildCobolSkeleton(safeRecord, safeApp, safePgm, fields, valueMappings);
+                    cobolContent = BuildCobolSkeleton(safeRecord, safeApp, safePgm, fields, valueMappings, mappingLookup);
                 }
                 await File.WriteAllTextAsync(Path.Combine(outputFolder, fn), cobolContent, Encoding.UTF8);
                 result.CobolSkeletonFileName = fn;
@@ -170,11 +204,7 @@ namespace DataReconciliation.Application.Services
                 string jclContent;
                 if (request.UseAiMode)
                 {
-                    _logger.LogInformation("AI Mode: generating JCL. JobId={JobId}", jobId);
-                    var aiRequest = BuildAiRequest(
-                        jobId, "generate_jcl", safePgm, safeRecord, safeJob,
-                        position - 1, fields, finalMapping, valueMappings);
-                    var aiResult = await _aiAgent.RunAgentAsync(aiRequest);
+                    var aiResult = await jclAiTask!;
                     if (aiResult == null || string.IsNullOrWhiteSpace(aiResult.GeneratedCode))
                         throw new InvalidOperationException(
                             "AI service did not return JCL. " +
@@ -256,7 +286,8 @@ namespace DataReconciliation.Application.Services
             int totalRecordLength,
             IReadOnlyList<MainframeAssetFieldDto> fields,
             FinalMappingConfig? finalMapping,
-            ValueMappingsDocument? valueMappings)
+            ValueMappingsDocument? valueMappings,
+            List<Dictionary<string, object?>>? transformationRules = null)
         {
             var fieldDetails = fields.Select(f => new Dictionary<string, object?>
             {
@@ -316,17 +347,18 @@ namespace DataReconciliation.Application.Services
 
             return new MainframeAiAgentRequest
             {
-                JobId             = jobId,
-                PromptType        = promptType,
-                ProgramName       = programName,
-                RecordName        = recordName,
-                JobName           = jobName,
-                TotalRecordLength = totalRecordLength,
-                FieldDetails      = fieldDetails,
-                FieldMappings     = fieldMappings,
-                ValueMappings     = vmDict,
-                SourceDatasets    = sourceDatasets,
-                RequestId         = Guid.NewGuid().ToString(),
+                JobId               = jobId,
+                PromptType          = promptType,
+                ProgramName         = programName,
+                RecordName          = recordName,
+                JobName             = jobName,
+                TotalRecordLength   = totalRecordLength,
+                FieldDetails        = fieldDetails,
+                FieldMappings       = fieldMappings,
+                ValueMappings       = vmDict,
+                SourceDatasets      = sourceDatasets,
+                TransformationRules = transformationRules,
+                RequestId           = Guid.NewGuid().ToString(),
             };
         }
 
@@ -361,7 +393,8 @@ namespace DataReconciliation.Application.Services
             string appName,
             string programName,
             IReadOnlyList<MainframeAssetFieldDto> fields,
-            ValueMappingsDocument? valueMappings)
+            ValueMappingsDocument? valueMappings,
+            Dictionary<string, FinalMapping>? mappingLookup = null)
         {
             var cobolRecord = ToCobolName(recordName);
             var cobolInput = $"INPUT-{cobolRecord}";
@@ -436,6 +469,11 @@ namespace DataReconciliation.Application.Services
                 sb.AppendLine($"           05  WS-{ToCobolName(f.SourceField!)} {srcPic}.");
             }
             sb.AppendLine();
+            sb.AppendLine("      *--- Work areas for transformation operations ---");
+            sb.AppendLine("       01  WS-TEMP-FIELD        PIC X(256) VALUE SPACES.");
+            sb.AppendLine("       01  WS-NUMERIC-TEMP      PIC S9(15)V9(6) COMP-3.");
+            sb.AppendLine("       01  WS-STR-TEMP          PIC X(50)  VALUE SPACES.");
+            sb.AppendLine();
 
             // PROCEDURE DIVISION
             sb.AppendLine("       PROCEDURE DIVISION.");
@@ -506,26 +544,259 @@ namespace DataReconciliation.Application.Services
 
             foreach (var f in fields)
             {
-                sb.AppendLine($"      *    Target: {f.CobolFieldName,-30} Source: {f.SourceField ?? "(no source mapping)"}");
+                var mapping = mappingLookup?.GetValueOrDefault(f.FieldName);
+                var tr = mapping?.Transformations?.FirstOrDefault();
+                var op = (tr?.Operation ?? "DIRECT").ToUpperInvariant();
+                var aiP = tr?.AIParameters;
+                var src = string.IsNullOrWhiteSpace(f.SourceField) ? null : ToCobolName(f.SourceField!);
+
+                sb.AppendLine($"      *    Target: {f.CobolFieldName,-30} Source: {f.SourceField ?? "(none)"}  Op: {tr?.Operation ?? "DIRECT"}");
                 if (!string.IsNullOrWhiteSpace(f.Rule))
                     sb.AppendLine($"      *    Rule  : {f.Rule}");
                 if (!string.IsNullOrWhiteSpace(f.Format))
                     sb.AppendLine($"      *    Format: {f.Format}");
 
-                if (!string.IsNullOrWhiteSpace(f.SourceField))
+                if (src == null)
                 {
-                    sb.AppendLine($"           MOVE WS-{ToCobolName(f.SourceField!)}");
-                    sb.AppendLine($"               TO {f.CobolFieldName}.");
+                    if (op == "DEFAULT_VALUE" && (tr?.DefaultValue ?? AiParam(aiP, "value")) is { } dv0)
+                        sb.AppendLine($"           MOVE '{CobolLit(dv0)}' TO {f.CobolFieldName}.");
+                    else
+                    {
+                        sb.AppendLine($"           MOVE SPACES TO {f.CobolFieldName}.");
+                        sb.AppendLine($"      *    TODO: Provide source for {f.CobolFieldName}");
+                    }
                 }
                 else
                 {
-                    sb.AppendLine($"           MOVE SPACES TO {f.CobolFieldName}.");
-                    sb.AppendLine($"      *    TODO: Provide source for {f.CobolFieldName}");
+                    switch (op)
+                    {
+                        case "DATE_FORMAT":
+                            var dfOut = AiParam(aiP, "outputFormat", "output_format") ?? tr?.Format ?? "yyyyMMdd";
+                            sb.AppendLine($"      *    Date → {dfOut}  (verify CONVERT-DATE-TIME args for your runtime)");
+                            sb.AppendLine($"           MOVE FUNCTION CONVERT-DATE-TIME(WS-{src}, 'I-YMD', 'O-YMD')");
+                            sb.AppendLine($"               TO {f.CobolFieldName}.");
+                            break;
+
+                        case "TRUNCATE":
+                            var trMax = AiParam(aiP, "maxLength", "max_length") ?? "?";
+                            sb.AppendLine($"      *    Truncate to {trMax} chars");
+                            if (int.TryParse(trMax, out var trLen) && trLen > 0)
+                                sb.AppendLine($"           MOVE WS-{src}(1:{trLen}) TO {f.CobolFieldName}.");
+                            else
+                            {
+                                sb.AppendLine($"           MOVE WS-{src} TO {f.CobolFieldName}.");
+                                sb.AppendLine($"      *    TODO: Replace with reference modification WS-{src}(1:maxLength)");
+                            }
+                            break;
+
+                        case "PAD_LEFT":
+                            var plChar = AiParam(aiP, "padChar", "pad_character") ?? "0";
+                            var plLen = AiParam(aiP, "totalLength", "total_length", "width") ?? "?";
+                            sb.AppendLine($"      *    Pad left with '{plChar}' to total length {plLen}");
+                            sb.AppendLine($"           MOVE SPACES TO WS-TEMP-FIELD.");
+                            sb.AppendLine($"           STRING WS-{src} DELIMITED SIZE INTO WS-TEMP-FIELD.");
+                            sb.AppendLine($"           MOVE FUNCTION REVERSE(FUNCTION TRIM(");
+                            sb.AppendLine($"               FUNCTION REVERSE(WS-TEMP-FIELD), LEADING))");
+                            sb.AppendLine($"               TO {f.CobolFieldName}.");
+                            sb.AppendLine($"      *    TODO: Verify padding logic against your COBOL runtime version");
+                            break;
+
+                        case "PAD_RIGHT":
+                            var prChar = AiParam(aiP, "padChar", "pad_character") ?? " ";
+                            var prLen = AiParam(aiP, "totalLength", "total_length", "width") ?? "?";
+                            sb.AppendLine($"      *    Pad right with '{prChar}' to total length {prLen}");
+                            sb.AppendLine($"           MOVE WS-{src} TO {f.CobolFieldName}.");
+                            break;
+
+                        case "UPPERCASE":
+                            sb.AppendLine($"           MOVE FUNCTION UPPER-CASE(WS-{src})");
+                            sb.AppendLine($"               TO {f.CobolFieldName}.");
+                            break;
+
+                        case "LOWERCASE":
+                            sb.AppendLine($"           MOVE FUNCTION LOWER-CASE(WS-{src})");
+                            sb.AppendLine($"               TO {f.CobolFieldName}.");
+                            break;
+
+                        case "PROPERCASE":
+                            sb.AppendLine($"           MOVE WS-{src} TO {f.CobolFieldName}.");
+                            sb.AppendLine($"      *    TODO: PROPERCASE — no native COBOL function; use INSPECT or custom sub-program");
+                            break;
+
+                        case "MASK":
+                            var msVS = AiParam(aiP, "visibleStart") ?? "2";
+                            var msVE = AiParam(aiP, "visibleEnd") ?? "2";
+                            var msMC = AiParam(aiP, "maskChar") ?? "*";
+                            sb.AppendLine($"      *    Mask: keep first {msVS}, last {msVE} chars; rest replaced with '{msMC}'");
+                            sb.AppendLine($"           MOVE WS-{src} TO {f.CobolFieldName}.");
+                            sb.AppendLine($"           INSPECT {f.CobolFieldName}");
+                            sb.AppendLine($"               CONVERTING 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'");
+                            sb.AppendLine($"                       TO '{new string(msMC[0], 36)}'.");
+                            sb.AppendLine($"      *    TODO: Preserve first {msVS} and last {msVE} chars with reference modification");
+                            break;
+
+                        case "CONCAT":
+                            var concatFlds = AiParam(aiP, "fields") ?? src;
+                            var concatParts = (concatFlds ?? src!).Split(',',
+                                StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                            sb.AppendLine($"      *    Concatenate: {concatFlds}");
+                            sb.AppendLine($"           INITIALIZE WS-TEMP-FIELD.");
+                            sb.AppendLine($"           STRING");
+                            foreach (var cp in concatParts)
+                                sb.AppendLine($"               WS-{ToCobolName(cp)} DELIMITED SPACE");
+                            sb.AppendLine($"               INTO {f.CobolFieldName}");
+                            sb.AppendLine($"           END-STRING.");
+                            break;
+
+                        case "SPLIT":
+                            var spDelim = AiParam(aiP, "delimiter") ?? "/";
+                            var spIdx = AiParam(aiP, "index") ?? "0";
+                            sb.AppendLine($"      *    Split by '{spDelim}', take part index {spIdx}");
+                            sb.AppendLine($"           UNSTRING WS-{src} DELIMITED BY '{spDelim}'");
+                            sb.AppendLine($"               INTO {f.CobolFieldName}.");
+                            sb.AppendLine($"      *    TODO: Add additional INTO targets if multiple parts needed");
+                            break;
+
+                        case "DEFAULT_VALUE":
+                            var dvVal = CobolLit(tr?.DefaultValue ?? AiParam(aiP, "value") ?? string.Empty);
+                            sb.AppendLine($"      *    Default: '{dvVal}' when source is spaces");
+                            sb.AppendLine($"           IF WS-{src} = SPACES");
+                            sb.AppendLine($"               MOVE '{dvVal}' TO {f.CobolFieldName}");
+                            sb.AppendLine($"           ELSE");
+                            sb.AppendLine($"               MOVE WS-{src} TO {f.CobolFieldName}");
+                            sb.AppendLine($"           END-IF.");
+                            break;
+
+                        case "NULL_REPLACEMENT":
+                            var nrVal = CobolLit(AiParam(aiP, "value") ?? "0");
+                            sb.AppendLine($"      *    Null replacement: use '{nrVal}' when source is spaces");
+                            sb.AppendLine($"           IF WS-{src} = SPACES");
+                            sb.AppendLine($"               MOVE '{nrVal}' TO {f.CobolFieldName}");
+                            sb.AppendLine($"           ELSE");
+                            sb.AppendLine($"               MOVE WS-{src} TO {f.CobolFieldName}");
+                            sb.AppendLine($"           END-IF.");
+                            break;
+
+                        case "DECIMAL_FORMAT":
+                            var dfDp = AiParam(aiP, "decimalPlaces", "decimal_places") ?? "2";
+                            sb.AppendLine($"      *    Decimal format: {dfDp} decimal places");
+                            sb.AppendLine($"           MOVE FUNCTION NUMVAL(WS-{src}) TO WS-NUMERIC-TEMP.");
+                            sb.AppendLine($"           MOVE WS-NUMERIC-TEMP TO {f.CobolFieldName}.");
+                            sb.AppendLine($"      *    TODO: Ensure {f.CobolFieldName} PICTURE has V9({dfDp}) for decimal alignment");
+                            break;
+
+                        case "CURRENCY_NORMALIZATION":
+                            var cnDp = AiParam(aiP, "decimalPlaces") ?? "2";
+                            sb.AppendLine($"      *    Currency normalization ({cnDp} decimal places)");
+                            sb.AppendLine($"           MOVE FUNCTION NUMVAL-C(WS-{src}) TO WS-NUMERIC-TEMP.");
+                            sb.AppendLine($"           MOVE WS-NUMERIC-TEMP TO {f.CobolFieldName}.");
+                            break;
+
+                        case "STRING_TO_NUMERIC":
+                            sb.AppendLine($"      *    String to numeric");
+                            sb.AppendLine($"           MOVE FUNCTION NUMVAL(WS-{src}) TO {f.CobolFieldName}.");
+                            break;
+
+                        case "NUMERIC_TO_STRING":
+                            sb.AppendLine($"      *    Numeric to string");
+                            sb.AppendLine($"           MOVE WS-{src} TO {f.CobolFieldName}.");
+                            break;
+
+                        case "REMOVE_SPECIAL_CHARACTERS":
+                            sb.AppendLine($"      *    Remove special characters");
+                            sb.AppendLine($"           MOVE WS-{src} TO {f.CobolFieldName}.");
+                            sb.AppendLine($"           INSPECT {f.CobolFieldName}");
+                            sb.AppendLine($"               CONVERTING '!@#$%^&*()-+=[]|;:,.<>?' TO SPACES.");
+                            break;
+
+                        case "BOOLEAN_MAPPING":
+                            var bmTrue = CobolLit(AiParam(aiP, "trueOutput") ?? "1");
+                            var bmFalse = CobolLit(AiParam(aiP, "falseOutput") ?? "0");
+                            sb.AppendLine($"      *    Boolean: true → '{bmTrue}', false → '{bmFalse}'");
+                            sb.AppendLine($"           EVALUATE WS-{src}");
+                            sb.AppendLine($"               WHEN 'Y' WHEN 'YES' WHEN 'TRUE' WHEN '1'");
+                            sb.AppendLine($"                   MOVE '{bmTrue}' TO {f.CobolFieldName}");
+                            sb.AppendLine($"               WHEN OTHER");
+                            sb.AppendLine($"                   MOVE '{bmFalse}' TO {f.CobolFieldName}");
+                            sb.AppendLine($"           END-EVALUATE.");
+                            break;
+
+                        case "FIXED_WIDTH_FORMAT":
+                            var fwW = AiParam(aiP, "width") ?? tr?.FixedWidth?.ToString() ?? "?";
+                            var fwA = AiParam(aiP, "alignment") ?? "LEFT";
+                            sb.AppendLine($"      *    Fixed-width {fwW} chars, {fwA}-aligned");
+                            sb.AppendLine($"           MOVE SPACES TO {f.CobolFieldName}.");
+                            sb.AppendLine($"           MOVE WS-{src} TO {f.CobolFieldName}.");
+                            sb.AppendLine($"      *    TODO: Verify alignment — use reference modification for RIGHT alignment");
+                            break;
+
+                        case "VALUE_MAPPING":
+                            sb.AppendLine($"           MOVE WS-{src} TO {f.CobolFieldName}.");
+                            sb.AppendLine($"      *    Value mapping applied in EVALUATE section below");
+                            break;
+
+                        case "JULIAN_TO_DATE":
+                            var jOutFmt = AiParam(aiP, "outputFormat") ?? "yyyyMMdd";
+                            sb.AppendLine($"      *    Julian YYDDD/YYYYDDD → Gregorian ({jOutFmt})");
+                            sb.AppendLine($"           PERFORM 3200-JULIAN-CONV-{f.CobolFieldName[..Math.Min(14, f.CobolFieldName.Length)]}.");
+                            sb.AppendLine($"      *    TODO: Code Julian-to-Gregorian paragraph using date arithmetic");
+                            break;
+
+                        case "DATE_TO_JULIAN":
+                            sb.AppendLine($"      *    Gregorian → Julian YYYYDDD");
+                            sb.AppendLine($"           PERFORM 3200-TO-JULIAN-{f.CobolFieldName[..Math.Min(14, f.CobolFieldName.Length)]}.");
+                            sb.AppendLine($"      *    TODO: Code Gregorian-to-Julian paragraph using COMPUTE with day-of-year");
+                            break;
+
+                        case "UNPACK_COMP3":
+                            var c3Dp = AiParam(aiP, "impliedDecimalPlaces") ?? "0";
+                            sb.AppendLine($"      *    COMP-3 packed decimal decode ({c3Dp} implied decimal places)");
+                            sb.AppendLine($"           MOVE WS-{src} TO {f.CobolFieldName}.");
+                            sb.AppendLine($"      *    TODO: Apply UNPACK via custom sub-program or use DISPLAY on COMP-3 field directly");
+                            break;
+
+                        case "DECIMAL_SHIFT":
+                            var dsPlaces = AiParam(aiP, "impliedDecimalPlaces", "decimalPlaces") ?? "2";
+                            sb.AppendLine($"      *    Implied decimal: divide by 10^{dsPlaces} (e.g. 12345 → 123.45)");
+                            sb.AppendLine($"           COMPUTE {f.CobolFieldName} = WS-{src} / {Math.Pow(10, int.TryParse(dsPlaces, out var dsp) ? dsp : 2):F0}.");
+                            break;
+
+                        case "CONDITIONAL_VALUE":
+                            var cvCond = CobolLit(AiParam(aiP, "condition") ?? "?");
+                            var cvTrue = CobolLit(AiParam(aiP, "trueValue") ?? "Y");
+                            var cvFalse = CobolLit(AiParam(aiP, "falseValue") ?? "N");
+                            sb.AppendLine($"      *    Conditional: if = '{cvCond}' then '{cvTrue}' else '{cvFalse}'");
+                            sb.AppendLine($"           EVALUATE WS-{src}");
+                            sb.AppendLine($"               WHEN '{cvCond}'");
+                            sb.AppendLine($"                   MOVE '{cvTrue}' TO {f.CobolFieldName}");
+                            sb.AppendLine($"               WHEN OTHER");
+                            sb.AppendLine($"                   MOVE '{cvFalse}' TO {f.CobolFieldName}");
+                            sb.AppendLine($"           END-EVALUATE.");
+                            break;
+
+                        case "SUBSTRING":
+                            var ssStart = AiParam(aiP, "start") ?? "1";
+                            var ssLen = AiParam(aiP, "length") ?? "?";
+                            sb.AppendLine($"      *    Substring: start={ssStart}, length={ssLen}");
+                            if (int.TryParse(ssStart, out var ssS) && int.TryParse(ssLen, out var ssL))
+                                sb.AppendLine($"           MOVE WS-{src}({ssS}:{ssL}) TO {f.CobolFieldName}.");
+                            else
+                            {
+                                sb.AppendLine($"           MOVE WS-{src} TO {f.CobolFieldName}.");
+                                sb.AppendLine($"      *    TODO: Replace with reference modification WS-{src}(start:length)");
+                            }
+                            break;
+
+                        default:
+                            sb.AppendLine($"           MOVE WS-{src}");
+                            sb.AppendLine($"               TO {f.CobolFieldName}.");
+                            break;
+                    }
                 }
                 sb.AppendLine();
             }
 
-            // Value mapping IF blocks
+            // Value mapping EVALUATE blocks (replaces per-entry IF chains)
             if (valueMappings?.Fields?.Count > 0)
             {
                 sb.AppendLine("      *--- VALUE MAPPING RULES (generated from value_mappings.json) ---");
@@ -534,12 +805,19 @@ namespace DataReconciliation.Application.Services
                     var targetCobol = ToCobolName(vmField.TargetField);
                     var sourceCobol = !string.IsNullOrWhiteSpace(vmField.SourceField)
                         ? $"WS-{ToCobolName(vmField.SourceField)}" : "(unknown-source)";
-                    foreach (var entry in vmField.Entries.Where(e => e.IsEnabled))
+                    var enabled = vmField.Entries.Where(e => e.IsEnabled).ToList();
+                    if (enabled.Count == 0) continue;
+
+                    sb.AppendLine($"           EVALUATE {sourceCobol}");
+                    foreach (var entry in enabled)
                     {
-                        sb.AppendLine($"           IF {sourceCobol} = '{entry.SourceValue}'");
-                        sb.AppendLine($"               MOVE '{entry.TargetValue}' TO {targetCobol}");
-                        sb.AppendLine($"           END-IF.");
+                        sb.AppendLine($"               WHEN '{CobolLit(entry.SourceValue)}'");
+                        sb.AppendLine($"                   MOVE '{CobolLit(entry.TargetValue)}' TO {targetCobol}");
                     }
+                    sb.AppendLine($"               WHEN OTHER");
+                    sb.AppendLine($"                   CONTINUE");
+                    sb.AppendLine($"           END-EVALUATE.");
+                    sb.AppendLine();
                 }
             }
 
@@ -835,6 +1113,18 @@ namespace DataReconciliation.Application.Services
             var n = Regex.Replace(value?.Trim() ?? string.Empty, @"[^A-Za-z0-9_\-]+", "_");
             n = Regex.Replace(n, "_+", "_").Trim('_');
             return string.IsNullOrWhiteSpace(n) ? fallback : n;
+        }
+
+        // Escape single-quote in COBOL string literals by doubling it.
+        private static string CobolLit(string value) => value.Replace("'", "''");
+
+        // Look up a key from AIParameters dict, trying multiple name variants.
+        private static string? AiParam(Dictionary<string, string>? dict, params string[] keys)
+        {
+            if (dict == null) return null;
+            foreach (var k in keys)
+                if (dict.TryGetValue(k, out var v) && v != null) return v;
+            return null;
         }
     }
 }

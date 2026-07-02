@@ -1803,6 +1803,25 @@ else
         let overrideData = [];
         let overrideCatalog = [];
 
+        // Operations that need a custom expression — keys match TransformationCatalog entries
+        const EXPR_HINTS = {
+            'PAD_LEFT_ZEROS':         'Total length (e.g. 10)',
+            'PAD_LEFT_SPACES':        'Total length (e.g. 10)',
+            'PAD_RIGHT_SPACES':       'Total length (e.g. 10)',
+            'TRUNCATE':               'Max length (e.g. 20)',
+            'FIXED_WIDTH_FORMAT':     'width,alignment,padChar (e.g. 10,LEFT,0)',
+            'MASK':                   'visibleStart,visibleEnd,maskChar (e.g. 0,4,*)',
+            'DECIMAL_FORMAT':         'decimalPlaces[,stripSeparator] (e.g. 2 or 2,true)',
+            'CURRENCY_NORMALIZATION': 'Decimal places (e.g. 2)',
+            'NULL_REPLACEMENT':       'Value when blank (e.g. 0 or N/A)',
+            'CONCAT':                 'Field names (e.g. FIRST_NAME,LAST_NAME)',
+            'SPLIT':                  'delimiter,index (e.g. /,1)',
+            'DEFAULT_VALUE':          'Constant value (e.g. 0 or UNKNOWN)',
+            'HARDCODED':              'Constant value (e.g. 0 or UNKNOWN)',
+            'CUSTOM':                 'Custom expression (e.g. LEFT(source,10))',
+        };
+        const EXPR_REQUIRED = new Set(Object.keys(EXPR_HINTS));
+
         document.getElementById('loadOverridesBtn')?.addEventListener('click', loadOverrides);
 
         async function loadOverrides() {
@@ -1851,14 +1870,16 @@ else
                     <td>
                         <input type="text" class="form-control form-control-sm override-expression" data-index="${i}"
                             value="${escHtml(o.customExpression ?? '')}"
-                            placeholder="e.g. LEFT(source,10)" ${o.overrideTransformation === 'CUSTOM' || o.overrideTransformation === 'CONCAT' ? '' : 'disabled'} />
+                            placeholder="${escHtml(EXPR_HINTS[o.overrideTransformation] ?? '')}"
+                            ${EXPR_REQUIRED.has(o.overrideTransformation) ? '' : 'disabled'} />
                     </td>
                     <td>${statusBadge}</td>`;
-                // Enable expression when CUSTOM or CONCAT is selected
                 const sel = tr.querySelector('.override-select');
                 const expr = tr.querySelector('.override-expression');
                 sel?.addEventListener('change', () => {
-                    expr.disabled = !(sel.value === 'CUSTOM' || sel.value === 'CONCAT' || sel.value === 'HARDCODED');
+                    const needsExpr = EXPR_REQUIRED.has(sel.value);
+                    expr.disabled = !needsExpr;
+                    expr.placeholder = EXPR_HINTS[sel.value] ?? '';
                     if (expr.disabled) expr.value = '';
                 });
                 tbody.appendChild(tr);

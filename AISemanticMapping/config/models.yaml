@@ -26,10 +26,10 @@ models:
     request_timeout: 60
 
   mainframe_agent:
-    provider: claude
-    model_name: claude-sonnet-4-6
+    provider: azure_openai
+    model_name: gpt-4o-mini
     temperature: 0.1
-    max_tokens: 16000
+    max_tokens: 8000
     top_p: 1.0
     request_timeout: 300
 

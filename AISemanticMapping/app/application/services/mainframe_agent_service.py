@@ -90,7 +90,7 @@ _CODE_GEN_PROMPT_TYPES = {
     "generate_recon_cobol",
     "generate_recon_jcl",
 }
-_CODE_GEN_MAX_TOKENS = 16000
+_CODE_GEN_MAX_TOKENS = 8000
 _DEFAULT_MAX_TOKENS  = 4000
 
 

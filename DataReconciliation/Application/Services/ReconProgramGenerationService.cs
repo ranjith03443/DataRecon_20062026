@@ -110,14 +110,31 @@ namespace DataReconciliation.Application.Services
             var folder = await GetReconFolderAsync(jobId);
             var ts     = timestamp.ToString("yyyyMMddHHmmss");
 
+            // Pre-launch AI tasks in parallel — recon COBOL and JCL are independent
+            var reconCobolAiTask = (request.UseAiMode && request.GenerateCobol)
+                ? _aiAgent.RunAgentAsync(BuildAiReconRequest(jobId, programName, jobName,
+                    totalRecordLength, reconResult.TotalTargetRecords, checks, "generate_recon_cobol"))
+                : null;
+            var reconJclAiTask = (request.UseAiMode && request.GenerateJcl)
+                ? _aiAgent.RunAgentAsync(BuildAiReconRequest(jobId, programName, jobName,
+                    totalRecordLength, reconResult.TotalTargetRecords, checks, "generate_recon_jcl"))
+                : null;
+
+            if (reconCobolAiTask != null && reconJclAiTask != null)
+            {
+                _logger.LogInformation(
+                    "AI Mode: awaiting recon COBOL + JCL generation in parallel. JobId={JobId}", jobId);
+                await Task.WhenAll(reconCobolAiTask, reconJclAiTask);
+            }
+            else if (reconCobolAiTask != null) await reconCobolAiTask;
+            else if (reconJclAiTask  != null) await reconJclAiTask;
+
             if (request.GenerateCobol)
             {
                 string cobolContent;
                 if (request.UseAiMode)
                 {
-                    var aiReq = BuildAiReconRequest(jobId, programName, jobName, totalRecordLength,
-                        reconResult.TotalTargetRecords, checks, "generate_recon_cobol");
-                    var aiResp = await _aiAgent.RunAgentAsync(aiReq);
+                    var aiResp = await reconCobolAiTask!;
                     if (string.IsNullOrWhiteSpace(aiResp?.GeneratedCode))
                         throw new InvalidOperationException(
                             "AI Mode is on but the AI service did not return a COBOL program. " +
@@ -141,9 +158,7 @@ namespace DataReconciliation.Application.Services
                 string jclContent;
                 if (request.UseAiMode)
                 {
-                    var aiReq = BuildAiReconRequest(jobId, programName, jobName, totalRecordLength,
-                        reconResult.TotalTargetRecords, checks, "generate_recon_jcl");
-                    var aiResp = await _aiAgent.RunAgentAsync(aiReq);
+                    var aiResp = await reconJclAiTask!;
                     if (string.IsNullOrWhiteSpace(aiResp?.GeneratedCode))
                         throw new InvalidOperationException(
                             "AI Mode is on but the AI service did not return a JCL job. " +

@@ -235,4 +235,161 @@ namespace DataReconciliation.Infrastructure.Transformations
             return d.ToString($"F{Math.Max(0, dp)}", CultureInfo.InvariantCulture);
         }
     }
+
+    // ─── Julian Date Conversion ───────────────────────────────────────────────
+    // JULIAN_TO_DATE  : converts YYDDD or YYYYDDD → Gregorian in outputFormat
+    // DATE_TO_JULIAN  : converts Gregorian date → YYYYDDD
+    public class JulianDateStrategy : ITransformationStrategy
+    {
+        public bool CanHandle(string operation) =>
+            operation.Equals("JULIAN_TO_DATE", StringComparison.OrdinalIgnoreCase) ||
+            operation.Equals("DATE_TO_JULIAN", StringComparison.OrdinalIgnoreCase);
+
+        public string Transform(TransformationExecutionInput input, TransformationRuleContract rule)
+        {
+            var value = (input.CurrentValue ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+
+            if (rule.Operation.Equals("JULIAN_TO_DATE", StringComparison.OrdinalIgnoreCase))
+                return JulianToGregorian(value, rule.Parameters.GetValueOrDefault("outputFormat") ?? "yyyyMMdd");
+
+            return GregorianToJulian(value);
+        }
+
+        private static string JulianToGregorian(string julian, string outputFormat)
+        {
+            // Accept YYDDD (2-digit year) or YYYYDDD (4-digit year)
+            int year;
+            int doy;
+            if (julian.Length == 5 && int.TryParse(julian[..2], out var yy) && int.TryParse(julian[2..], out doy))
+                year = yy >= 0 && yy <= 49 ? 2000 + yy : 1900 + yy;
+            else if (julian.Length == 7 && int.TryParse(julian[..4], out year) && int.TryParse(julian[4..], out doy))
+                { /* year and doy already set */ }
+            else
+                return julian;
+
+            try
+            {
+                var date = new DateTime(year, 1, 1).AddDays(doy - 1);
+                return date.ToString(outputFormat.Replace("YYYY", "yyyy").Replace("DD", "dd"),
+                    CultureInfo.InvariantCulture);
+            }
+            catch { return julian; }
+        }
+
+        private static string GregorianToJulian(string gregorian)
+        {
+            if (!DateTime.TryParse(gregorian, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) &&
+                !DateTime.TryParse(gregorian, out date))
+                return gregorian;
+            return $"{date.Year:D4}{date.DayOfYear:D3}";
+        }
+    }
+
+    // ─── COMP-3 Packed Decimal Decode ─────────────────────────────────────────
+    // Accepts a hex-encoded COMP-3 string (e.g. "0123456C" = +1234.56 with 2 implied decimal places)
+    // and converts it to a decimal string.
+    public class Comp3DecodeStrategy : ITransformationStrategy
+    {
+        public bool CanHandle(string operation) => operation.Equals("UNPACK_COMP3", StringComparison.OrdinalIgnoreCase);
+
+        public string Transform(TransformationExecutionInput input, TransformationRuleContract rule)
+        {
+            var value = (input.CurrentValue ?? string.Empty).Trim().ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(value)) return "0";
+
+            // Remove any whitespace or 0x prefix
+            value = value.Replace(" ", "").Replace("0X", "");
+
+            // Must be hex digits only
+            if (!Regex.IsMatch(value, "^[0-9A-F]+$")) return input.CurrentValue ?? "0";
+
+            // Last nibble is the sign: C/F = positive, D = negative
+            var lastChar = value[^1];
+            var negative = lastChar == 'D';
+
+            // All nibbles except the last are digits, the last is the sign
+            var digits = new StringBuilder();
+            for (int i = 0; i < value.Length - 1; i++)
+                digits.Append(value[i]);
+
+            if (!long.TryParse(digits.ToString(), out var rawNum)) return input.CurrentValue ?? "0";
+
+            var impliedDp = int.TryParse(rule.Parameters.GetValueOrDefault("impliedDecimalPlaces"), out var dp) ? dp : 0;
+            var result = impliedDp > 0
+                ? ((decimal)rawNum / (decimal)Math.Pow(10, impliedDp)).ToString($"F{impliedDp}", CultureInfo.InvariantCulture)
+                : rawNum.ToString(CultureInfo.InvariantCulture);
+
+            return negative ? $"-{result}" : result;
+        }
+    }
+
+    // ─── Implicit Decimal Shift ───────────────────────────────────────────────
+    // Mainframe integers often have an implied decimal: 12345 with 2 implied places → 123.45
+    public class DecimalShiftStrategy : ITransformationStrategy
+    {
+        public bool CanHandle(string operation) => operation.Equals("DECIMAL_SHIFT", StringComparison.OrdinalIgnoreCase);
+
+        public string Transform(TransformationExecutionInput input, TransformationRuleContract rule)
+        {
+            var value = (input.CurrentValue ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(value)) return "0";
+
+            var places = int.TryParse(rule.Parameters.GetValueOrDefault("impliedDecimalPlaces") ??
+                                      rule.Parameters.GetValueOrDefault("decimalPlaces"), out var dp) ? dp : 2;
+
+            if (!long.TryParse(Regex.Replace(value, "[^0-9\\-]", ""), out var raw)) return value;
+            var shifted = (decimal)raw / (decimal)Math.Pow(10, Math.Max(0, places));
+            return shifted.ToString($"F{Math.Max(0, places)}", CultureInfo.InvariantCulture);
+        }
+    }
+
+    // ─── Conditional Value ────────────────────────────────────────────────────
+    // Returns trueValue when the input equals condition, falseValue otherwise.
+    // Parameters: condition, trueValue, falseValue, [caseSensitive=false]
+    public class ConditionalValueStrategy : ITransformationStrategy
+    {
+        public bool CanHandle(string operation) => operation.Equals("CONDITIONAL_VALUE", StringComparison.OrdinalIgnoreCase);
+
+        public string Transform(TransformationExecutionInput input, TransformationRuleContract rule)
+        {
+            var value = input.CurrentValue ?? string.Empty;
+            var condition = rule.Parameters.GetValueOrDefault("condition") ?? string.Empty;
+            var trueVal = rule.Parameters.GetValueOrDefault("trueValue") ?? value;
+            var falseVal = rule.Parameters.GetValueOrDefault("falseValue") ?? value;
+            var cs = rule.Parameters.TryGetValue("caseSensitive", out var csv) &&
+                     csv.Equals("true", StringComparison.OrdinalIgnoreCase);
+
+            var match = cs
+                ? value == condition
+                : value.Equals(condition, StringComparison.OrdinalIgnoreCase);
+            return match ? trueVal : falseVal;
+        }
+    }
+
+    // ─── Substring Extraction ─────────────────────────────────────────────────
+    // Extracts a portion of the input by start position and optional length.
+    // Parameters: start (1-based, default 1), length (default: rest of string)
+    public class SubstringStrategy : ITransformationStrategy
+    {
+        public bool CanHandle(string operation) => operation.Equals("SUBSTRING", StringComparison.OrdinalIgnoreCase);
+
+        public string Transform(TransformationExecutionInput input, TransformationRuleContract rule)
+        {
+            var value = input.CurrentValue ?? string.Empty;
+            if (string.IsNullOrEmpty(value)) return string.Empty;
+
+            // start is 1-based (COBOL convention)
+            var start = int.TryParse(rule.Parameters.GetValueOrDefault("start"), out var s) ? Math.Max(1, s) : 1;
+            var zeroStart = start - 1;
+            if (zeroStart >= value.Length) return string.Empty;
+
+            if (rule.Parameters.TryGetValue("length", out var lenStr) && int.TryParse(lenStr, out var len) && len > 0)
+            {
+                var actualLen = Math.Min(len, value.Length - zeroStart);
+                return value.Substring(zeroStart, actualLen);
+            }
+            return value[zeroStart..];
+        }
+    }
 }

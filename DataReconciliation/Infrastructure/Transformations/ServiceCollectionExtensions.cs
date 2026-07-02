@@ -26,6 +26,11 @@ namespace DataReconciliation.Infrastructure.Transformations
             services.AddSingleton<ITransformationStrategy, ProperCaseStrategy>();
             services.AddSingleton<ITransformationStrategy, BooleanMappingStrategy>();
             services.AddSingleton<ITransformationStrategy, CurrencyNormalizationStrategy>();
+            services.AddSingleton<ITransformationStrategy, JulianDateStrategy>();
+            services.AddSingleton<ITransformationStrategy, Comp3DecodeStrategy>();
+            services.AddSingleton<ITransformationStrategy, DecimalShiftStrategy>();
+            services.AddSingleton<ITransformationStrategy, ConditionalValueStrategy>();
+            services.AddSingleton<ITransformationStrategy, SubstringStrategy>();
 
             services.AddSingleton<ITransformationStrategyFactory, TransformationStrategyFactory>();
             services.AddScoped<ITransformationExecutionService, TransformationExecutionService>();

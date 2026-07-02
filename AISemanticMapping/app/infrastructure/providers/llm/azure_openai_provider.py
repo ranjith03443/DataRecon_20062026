@@ -100,6 +100,8 @@ class AzureOpenAIProvider(ILLMProvider):
             "max_tokens": max_tokens,
             "top_p": float(self._model_config.get("top_p", 1.0)),
         }
+        if kwargs.get("json_mode"):
+            payload["response_format"] = {"type": "json_object"}
 
         last_exception = None
         for attempt in range(_MAX_RETRIES):

@@ -17,26 +17,48 @@ namespace DataReconciliation.Application.Services
         private readonly ILogger<TransformationOverrideService> _logger;
 
         /// <summary>
-        /// The catalog of available transformation operations.
+        /// UI-friendly catalog of transformation operations shown in the override dropdown.
+        /// Each entry is mapped to a canonical registry operation by BuildTransformationRule.
         /// </summary>
         public static readonly string[] TransformationCatalog = new[]
         {
             "DIRECT",
+            // Date (pre-defined format combos for common mainframe/banking patterns)
             "DATE_YYYYMMDD",
             "DATE_DDMMYYYY",
             "DATE_MMDDYYYY",
             "DATE_DD/MM/YYYY",
             "DATE_MM/DD/YYYY",
             "DATE_YYYY/MM/DD",
-            "LEFT_PAD",
-            "RIGHT_PAD",
+            "DATE_YYYY-MM-DD",
+            // Padding & width
+            "PAD_LEFT_ZEROS",
+            "PAD_LEFT_SPACES",
+            "PAD_RIGHT_SPACES",
             "TRUNCATE",
+            "FIXED_WIDTH_FORMAT",
+            // Case
             "UPPERCASE",
             "LOWERCASE",
-            "CONCAT",
+            "PROPERCASE",
+            // Masking & numeric
+            "MASK",
+            "DECIMAL_FORMAT",
+            "STRING_TO_NUMERIC",
+            "NUMERIC_TO_STRING",
+            "CURRENCY_NORMALIZATION",
+            // String
+            "REMOVE_SPECIAL_CHARACTERS",
+            // Logic & mapping
+            "BOOLEAN_MAPPING",
             "VALUE_MAPPING",
-            "HARDCODED",
-            "CUSTOM"
+            "NULL_REPLACEMENT",
+            // Structural
+            "CONCAT",
+            "SPLIT",
+            // Assignment & custom
+            "DEFAULT_VALUE",
+            "CUSTOM",
         };
 
         public TransformationOverrideService(
@@ -184,42 +206,172 @@ namespace DataReconciliation.Application.Services
 
         private static TransformationRule? BuildTransformationRule(string operation, string? customExpression)
         {
-            return operation.ToUpperInvariant() switch
+            var op   = (operation ?? string.Empty).ToUpperInvariant().Trim();
+            var expr = (customExpression ?? string.Empty).Trim();
+
+            switch (op)
             {
-                "DIRECT" => null, // No transformation needed
-                "DATE_YYYYMMDD" => new TransformationRule { Operation = "DATE_FORMATTING", Format = "yyyyMMdd" },
-                "DATE_DDMMYYYY" => new TransformationRule { Operation = "DATE_FORMATTING", Format = "ddMMyyyy" },
-                "DATE_MMDDYYYY" => new TransformationRule { Operation = "DATE_FORMATTING", Format = "MMddyyyy" },
-                "DATE_DD/MM/YYYY" => new TransformationRule { Operation = "DATE_FORMATTING", Format = "dd/MM/yyyy" },
-                "DATE_MM/DD/YYYY" => new TransformationRule { Operation = "DATE_FORMATTING", Format = "MM/dd/yyyy" },
-                "DATE_YYYY/MM/DD" => new TransformationRule { Operation = "DATE_FORMATTING", Format = "yyyy/MM/dd" },
-                "LEFT_PAD" => new TransformationRule { Operation = "FIXED_WIDTH_FORMATTING", Alignment = "RIGHT", PadCharacter = "0" },
-                "RIGHT_PAD" => new TransformationRule { Operation = "FIXED_WIDTH_FORMATTING", Alignment = "LEFT", PadCharacter = " " },
-                "TRUNCATE" => new TransformationRule { Operation = "FIXED_WIDTH_FORMATTING", Alignment = "LEFT" },
-                "UPPERCASE" => new TransformationRule { Operation = "UPPERCASE" },
-                "LOWERCASE" => new TransformationRule { Operation = "LOWERCASE" },
-                "CONCAT" => new TransformationRule
+                case "DIRECT": return null;
+
+                // ── Date: map UI-friendly format names to canonical DATE_FORMAT ──────────
+                case "DATE_YYYYMMDD":   return DateFmt("yyyyMMdd");
+                case "DATE_DDMMYYYY":   return DateFmt("ddMMyyyy");
+                case "DATE_MMDDYYYY":   return DateFmt("MMddyyyy");
+                case "DATE_DD/MM/YYYY": return DateFmt("dd/MM/yyyy");
+                case "DATE_MM/DD/YYYY": return DateFmt("MM/dd/yyyy");
+                case "DATE_YYYY/MM/DD": return DateFmt("yyyy/MM/dd");
+                case "DATE_YYYY-MM-DD": return DateFmt("yyyy-MM-dd");
+
+                // ── Padding: canonical PAD_LEFT / PAD_RIGHT ───────────────────────────
+                // expr (optional) = target total length, e.g. "10"
+                case "PAD_LEFT_ZEROS":   return PadOp("PAD_LEFT",  "0", FirstPart(expr));
+                case "PAD_LEFT_SPACES":  return PadOp("PAD_LEFT",  " ", FirstPart(expr));
+                case "PAD_RIGHT_SPACES": return PadOp("PAD_RIGHT", " ", FirstPart(expr));
+                case "LEFT_PAD":         return PadOp("PAD_LEFT",  "0", null);   // backward-compat
+                case "RIGHT_PAD":        return PadOp("PAD_RIGHT", " ", null);   // backward-compat
+
+                // ── Width / truncation ────────────────────────────────────────────────
+                // TRUNCATE expr (optional) = max length, e.g. "20"
+                case "TRUNCATE":
                 {
-                    Operation = "CONCATENATION",
-                    AIParameters = !string.IsNullOrWhiteSpace(customExpression)
-                        ? new Dictionary<string, string> { { "expression", customExpression } }
-                        : null
-                },
-                "VALUE_MAPPING" => new TransformationRule { Operation = "VALUE_MAPPING", Rules = new Dictionary<string, string>() },
-                "HARDCODED" => new TransformationRule
+                    var ai = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    if (!string.IsNullOrWhiteSpace(expr)) ai["maxLength"] = expr;
+                    return new TransformationRule { Operation = "TRUNCATE", AIParameters = ai.Count > 0 ? ai : null };
+                }
+
+                // FIXED_WIDTH_FORMAT expr (optional) = "width,alignment,padChar"  e.g. "10,LEFT,0"
+                case "FIXED_WIDTH_FORMAT":
                 {
-                    Operation = "HARDCODED_VALUE",
-                    DefaultValue = customExpression
-                },
-                "CUSTOM" => new TransformationRule
+                    var p  = SplitParts(expr, 3);
+                    var ai = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    if (!string.IsNullOrWhiteSpace(p[0])) ai["width"]     = p[0];
+                    if (!string.IsNullOrWhiteSpace(p[1])) ai["alignment"] = p[1].ToUpperInvariant();
+                    if (!string.IsNullOrWhiteSpace(p[2])) ai["padChar"]   = p[2];
+                    return new TransformationRule { Operation = "FIXED_WIDTH_FORMAT", AIParameters = ai.Count > 0 ? ai : null };
+                }
+
+                // ── Case ──────────────────────────────────────────────────────────────
+                case "UPPERCASE":  return new TransformationRule { Operation = "UPPERCASE" };
+                case "LOWERCASE":  return new TransformationRule { Operation = "LOWERCASE" };
+                case "PROPERCASE": return new TransformationRule { Operation = "PROPERCASE" };
+
+                // ── Masking ───────────────────────────────────────────────────────────
+                // expr (optional) = "visibleStart,visibleEnd,maskChar"  e.g. "0,4,*"
+                case "MASK":
                 {
-                    Operation = "CUSTOM",
-                    AIParameters = !string.IsNullOrWhiteSpace(customExpression)
-                        ? new Dictionary<string, string> { { "expression", customExpression } }
-                        : null
-                },
-                _ => new TransformationRule { Operation = operation }
-            };
+                    var p  = SplitParts(expr, 3);
+                    var ai = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    if (!string.IsNullOrWhiteSpace(p[0])) ai["visibleStart"] = p[0];
+                    if (!string.IsNullOrWhiteSpace(p[1])) ai["visibleEnd"]   = p[1];
+                    if (!string.IsNullOrWhiteSpace(p[2])) ai["maskChar"]     = p[2];
+                    return new TransformationRule { Operation = "MASK", AIParameters = ai.Count > 0 ? ai : null };
+                }
+
+                // ── Numeric ───────────────────────────────────────────────────────────
+                // DECIMAL_FORMAT expr (optional) = "decimalPlaces" or "decimalPlaces,stripSeparator"
+                case "DECIMAL_FORMAT":
+                {
+                    var p  = SplitParts(expr, 2);
+                    var ai = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    if (!string.IsNullOrWhiteSpace(p[0])) ai["decimalPlaces"] = p[0];
+                    if (!string.IsNullOrWhiteSpace(p[1])) ai["stripDecimalSeparator"] = p[1];
+                    return new TransformationRule { Operation = "DECIMAL_FORMAT", AIParameters = ai.Count > 0 ? ai : null };
+                }
+
+                case "STRING_TO_NUMERIC":    return new TransformationRule { Operation = "STRING_TO_NUMERIC" };
+                case "NUMERIC_TO_STRING":    return new TransformationRule { Operation = "NUMERIC_TO_STRING" };
+
+                // CURRENCY_NORMALIZATION expr (optional) = decimal places, e.g. "2"
+                case "CURRENCY_NORMALIZATION":
+                {
+                    var ai = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    if (!string.IsNullOrWhiteSpace(expr)) ai["decimalPlaces"] = expr;
+                    return new TransformationRule { Operation = "CURRENCY_NORMALIZATION", AIParameters = ai.Count > 0 ? ai : null };
+                }
+
+                // ── String ────────────────────────────────────────────────────────────
+                case "REMOVE_SPECIAL_CHARACTERS": return new TransformationRule { Operation = "REMOVE_SPECIAL_CHARACTERS" };
+
+                // ── Logic & mapping ───────────────────────────────────────────────────
+                case "BOOLEAN_MAPPING": return new TransformationRule { Operation = "BOOLEAN_MAPPING" };
+
+                case "VALUE_MAPPING": return new TransformationRule { Operation = "VALUE_MAPPING", Rules = new Dictionary<string, string>() };
+
+                // NULL_REPLACEMENT expr = replacement value when source is blank, e.g. "N/A"
+                case "NULL_REPLACEMENT":
+                    return new TransformationRule
+                    {
+                        Operation    = "NULL_REPLACEMENT",
+                        AIParameters = !string.IsNullOrWhiteSpace(expr)
+                            ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["value"] = expr }
+                            : null
+                    };
+
+                // ── Structural ────────────────────────────────────────────────────────
+                // CONCAT expr = comma-separated field names, e.g. "FIRST_NAME,LAST_NAME"
+                case "CONCAT":
+                    return new TransformationRule
+                    {
+                        Operation    = "CONCAT",
+                        AIParameters = !string.IsNullOrWhiteSpace(expr)
+                            ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["fields"] = expr }
+                            : null
+                    };
+
+                // SPLIT expr = "delimiter,index"  e.g. "/,1"
+                case "SPLIT":
+                {
+                    var p  = SplitParts(expr, 2);
+                    var ai = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    if (!string.IsNullOrWhiteSpace(p[0])) ai["delimiter"] = p[0];
+                    if (!string.IsNullOrWhiteSpace(p[1])) ai["index"]     = p[1];
+                    return new TransformationRule { Operation = "SPLIT", AIParameters = ai.Count > 0 ? ai : null };
+                }
+
+                // ── Assignment ────────────────────────────────────────────────────────
+                // DEFAULT_VALUE / HARDCODED (backward-compat) expr = the constant value
+                case "DEFAULT_VALUE":
+                case "HARDCODED":
+                    return new TransformationRule
+                    {
+                        Operation    = "DEFAULT_VALUE",
+                        DefaultValue = string.IsNullOrWhiteSpace(expr) ? null : expr
+                    };
+
+                // ── Custom ────────────────────────────────────────────────────────────
+                case "CUSTOM":
+                    return new TransformationRule
+                    {
+                        Operation    = "CUSTOM",
+                        AIParameters = !string.IsNullOrWhiteSpace(expr)
+                            ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["expression"] = expr }
+                            : null
+                    };
+
+                default:
+                    return new TransformationRule { Operation = operation };
+            }
+
+            // ── Local helpers ─────────────────────────────────────────────────────────
+
+            static TransformationRule DateFmt(string fmt) =>
+                new() { Operation = "DATE_FORMAT", AIParameters = new(StringComparer.OrdinalIgnoreCase) { ["outputFormat"] = fmt } };
+
+            static TransformationRule PadOp(string canonicalOp, string padChar, string? width)
+            {
+                var ai = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["padChar"] = padChar };
+                if (!string.IsNullOrWhiteSpace(width)) ai["totalLength"] = width;
+                return new TransformationRule { Operation = canonicalOp, AIParameters = ai };
+            }
+
+            static string[] SplitParts(string input, int count)
+            {
+                var raw = input.Split(',', StringSplitOptions.None).Select(p => p.Trim()).ToArray();
+                if (raw.Length >= count) return raw;
+                return raw.Concat(Enumerable.Repeat(string.Empty, count - raw.Length)).ToArray();
+            }
+
+            static string FirstPart(string input) => input.Split(',')[0].Trim();
         }
     }
 }
