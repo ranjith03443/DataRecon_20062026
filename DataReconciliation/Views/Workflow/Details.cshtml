@@ -228,6 +228,10 @@
                        class="btn btn-outline-secondary btn-sm">
                         <i class="fas fa-link me-1"></i>View Mappings
                     </a>
+                    <a asp-controller="Reports" asp-action="GovernanceDashboard" asp-route-jobId="@Model.Job.JobId"
+                       class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-shield-halved me-1"></i>AI Governance
+                    </a>
                     <a asp-controller="Reports" asp-action="AIAudit" asp-route-jobId="@Model.Job.JobId"
                        class="btn btn-outline-warning btn-sm">
                         <i class="fas fa-robot me-1"></i>AI Audit

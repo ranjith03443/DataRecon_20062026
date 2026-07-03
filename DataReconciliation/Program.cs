@@ -66,6 +66,7 @@ builder.Services.AddScoped<IWorkflowStepExecutionRepository, WorkflowStepExecuti
 builder.Services.AddScoped<IWorkflowArtifactRepository, WorkflowArtifactRepository>();
 builder.Services.AddScoped<IAIInferenceAuditRepository, AIInferenceAuditRepository>();
 builder.Services.AddScoped<IErrorAuditLogRepository, ErrorAuditLogRepository>();
+builder.Services.AddScoped<IHistoricalMappingRepository, HistoricalMappingRepository>();
 
 // ─── Infrastructure Services ──────────────────────────────────────────────────
 builder.Services.AddScoped<IArtifactPersistenceService, ArtifactPersistenceService>();
@@ -145,6 +146,12 @@ builder.Services.AddScoped<IDeltaFileUploadService, DeltaFileUploadService>();
 builder.Services.AddScoped<IReconciliationConfigService, ReconciliationConfigService>();
 builder.Services.AddScoped<ITransformationOverrideService, TransformationOverrideService>();
 
+// ─── Governance & Evaluation Services ────────────────────────────────────────
+builder.Services.AddScoped<IEvaluationService, EvaluationService>();
+builder.Services.AddScoped<IAuditLoggingService, AuditLoggingService>();
+builder.Services.AddScoped<IHistoricalMappingService, HistoricalMappingService>();
+builder.Services.AddScoped<IRagSyncService, RagSyncService>();
+
 if (aiProvider.Equals("PythonService", StringComparison.OrdinalIgnoreCase))
 {
     builder.Services.AddHttpClient<IValueMappingAIAgentService, PythonValueMappingAgentService>(client =>
@@ -198,7 +205,26 @@ using (var scope = app.Services.CreateScope())
             "ALTER TABLE \"AIInferenceAudits\" ADD COLUMN \"PromptTokens\" INTEGER",
             "ALTER TABLE \"AIInferenceAudits\" ADD COLUMN \"CompletionTokens\" INTEGER",
             "ALTER TABLE \"AIInferenceAudits\" ADD COLUMN \"TotalTokens\" INTEGER",
-            "ALTER TABLE \"AIInferenceAudits\" ADD COLUMN \"EstimatedCostUsd\" REAL"
+            "ALTER TABLE \"AIInferenceAudits\" ADD COLUMN \"EstimatedCostUsd\" REAL",
+            "ALTER TABLE \"WorkflowJobs\" ADD COLUMN \"ReviewerName\" TEXT NOT NULL DEFAULT ''",
+            @"CREATE TABLE IF NOT EXISTS ""HistoricalMappings"" (
+                ""Id"" INTEGER PRIMARY KEY AUTOINCREMENT,
+                ""TargetField"" TEXT NOT NULL,
+                ""SourceField"" TEXT NOT NULL,
+                ""SourceDataset"" TEXT,
+                ""Confidence"" REAL NOT NULL DEFAULT 0,
+                ""MatchSource"" TEXT,
+                ""TransformationSummary"" TEXT,
+                ""UsageCount"" INTEGER NOT NULL DEFAULT 1,
+                ""LastJobId"" TEXT,
+                ""LastReviewerName"" TEXT,
+                ""Notes"" TEXT,
+                ""IsActive"" INTEGER NOT NULL DEFAULT 1,
+                ""CreatedAt"" TEXT NOT NULL,
+                ""LastUsedAt"" TEXT NOT NULL
+            )",
+            @"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_HistoricalMappings_TargetField"" ON ""HistoricalMappings"" (""TargetField"")",
+            @"CREATE INDEX IF NOT EXISTS ""IX_HistoricalMappings_IsActive"" ON ""HistoricalMappings"" (""IsActive"")"
         })
         {
             try { cmd.CommandText = ddl; cmd.ExecuteNonQuery(); }

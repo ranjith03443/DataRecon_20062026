@@ -13,6 +13,7 @@ namespace DataReconciliation.Infrastructure.Persistence
         public DbSet<WorkflowArtifact> WorkflowArtifacts => Set<WorkflowArtifact>();
         public DbSet<AIInferenceAudit> AIInferenceAudits => Set<AIInferenceAudit>();
         public DbSet<ErrorAuditLog> ErrorAuditLogs => Set<ErrorAuditLog>();
+        public DbSet<HistoricalMappingEntry> HistoricalMappings => Set<HistoricalMappingEntry>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -61,6 +62,14 @@ namespace DataReconciliation.Infrastructure.Persistence
                 e.HasKey(x => x.Id);
                 e.HasIndex(x => x.JobId);
                 e.Property(x => x.Step).HasConversion<string>();
+            });
+
+            // HistoricalMappingEntry
+            modelBuilder.Entity<HistoricalMappingEntry>(e =>
+            {
+                e.HasKey(x => x.Id);
+                e.HasIndex(x => x.TargetField).IsUnique();
+                e.HasIndex(x => x.IsActive);
             });
         }
     }

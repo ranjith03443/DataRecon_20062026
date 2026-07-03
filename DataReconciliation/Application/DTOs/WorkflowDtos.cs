@@ -49,6 +49,7 @@ namespace DataReconciliation.Application.DTOs
     {
         public string JobName { get; set; } = string.Empty;
         public string? Description { get; set; }
+        public string ReviewerName { get; set; } = string.Empty;
         public List<DatasetUploadDto> Datasets { get; set; } = new();
         /// <summary>Optional source parameter file (.xlsx) for value mapping discovery context.</summary>
         public IFormFile? SourceParameterFile { get; set; }

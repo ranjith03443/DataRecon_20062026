@@ -27,6 +27,8 @@ namespace DataReconciliation.Controllers
         private readonly IReconciliationConfigService? _reconciliationConfig;
         private readonly ITransformationOverrideService? _transformationOverride;
         private readonly IReconciliationService? _reconciliationService;
+        private readonly IAuditLoggingService? _auditLogging;
+        private readonly IEvaluationService? _evaluationService;
 
         public ReportsController(
             IWorkflowJobRepository jobRepo,
@@ -43,7 +45,9 @@ namespace DataReconciliation.Controllers
             IDeltaFileUploadService? deltaFileUpload = null,
             IReconciliationConfigService? reconciliationConfig = null,
             ITransformationOverrideService? transformationOverride = null,
-            IReconciliationService? reconciliationService = null)
+            IReconciliationService? reconciliationService = null,
+            IAuditLoggingService? auditLogging = null,
+            IEvaluationService? evaluationService = null)
         {
             _jobRepo = jobRepo;
             _artifactRepo = artifactRepo;
@@ -60,6 +64,8 @@ namespace DataReconciliation.Controllers
             _reconciliationConfig = reconciliationConfig;
             _transformationOverride = transformationOverride;
             _reconciliationService = reconciliationService;
+            _auditLogging = auditLogging;
+            _evaluationService = evaluationService;
         }
         [HttpGet]
         public async Task<IActionResult> Index()
@@ -189,8 +195,24 @@ namespace DataReconciliation.Controllers
                 ? Path.GetFileName(manifestForSeed!.ValueMappingsExcelFilePath)
                 : null;
 
+            // Build field→dataset map for the Unmapped Source Fields tab
+            var sourceFieldsByDataset = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (manifest != null)
+            {
+                foreach (var dataset in manifest.Datasets.Where(d => d.DatasetRole == Domain.Enums.DatasetRole.SOURCE))
+                {
+                    var dsProfile = await _artifactPersistence.LoadArtifactByNameAsync<DataReconciliation.Domain.Models.SourceSchemaProfile>(
+                        jobId, $"source_schema_profile_{dataset.DatasetId}.json");
+                    if (dsProfile != null)
+                        foreach (var field in dsProfile.Fields)
+                            if (!string.IsNullOrWhiteSpace(field.FieldName) && !sourceFieldsByDataset.ContainsKey(field.FieldName))
+                                sourceFieldsByDataset[field.FieldName] = dataset.DatasetId;
+                }
+            }
+
             ViewBag.JobId = jobId;
             ViewBag.SourceFields = allSourceFields.Distinct().OrderBy(f => f).ToList();
+            ViewBag.SourceFieldsByDataset = sourceFieldsByDataset;
             ViewBag.ValueMappingTemplates = templateInfos;
             ViewBag.SourceFieldLengths = sourceFieldLengths;
             ViewBag.TargetFieldLengths = targetFieldLengths;
@@ -212,6 +234,13 @@ namespace DataReconciliation.Controllers
                 TempData["Error"] = "Mapping configuration not found.";
                 return RedirectToAction(nameof(Mappings), new { jobId });
             }
+
+            // Snapshot source fields BEFORE mutation so we can detect what the user changed
+            var originalSources = finalMapping.Mappings
+                .ToDictionary(
+                    m => m.TargetField,
+                    m => new { m.SourceField, m.Confidence, m.MatchSource },
+                    StringComparer.OrdinalIgnoreCase);
 
             var updates = request?.Updates ?? new List<MappingUpdateDto>();
             var deleteTargets = updates
@@ -311,6 +340,49 @@ namespace DataReconciliation.Controllers
                 jobId, finalMapping, Domain.Enums.ArtifactType.FinalMappingConfig, "final_mapping_config.json");
 
             _logger.LogInformation("Mappings manually updated. JobId={JobId} UpdatedCount={UpdatedCount} DeletedCount={DeletedCount}", jobId, updated, deleted);
+
+            // ── Audit: record each explicit human decision ────────────────────────
+            if (_auditLogging != null && (updated > 0 || deleted > 0))
+            {
+                try
+                {
+                    var reviewer = (await _jobRepo.GetByJobIdAsync(jobId))?.ReviewerName ?? "System";
+                    foreach (var update in updates)
+                    {
+                        if (update.Delete)
+                        {
+                            await _auditLogging.AppendAuditEntryAsync(jobId, new Domain.Models.AuditEntry
+                            {
+                                Reviewer     = reviewer,
+                                ActionType   = Domain.Models.AuditActionType.MappingRejected,
+                                WorkflowStep = "MappingConsolidation",
+                                TargetField  = update.TargetField,
+                                AiSuggested  = originalSources.TryGetValue(update.TargetField, out var orig) ? orig.SourceField : null,
+                                Notes        = "Mapping deleted by reviewer"
+                            });
+                        }
+                        else if (originalSources.TryGetValue(update.TargetField, out var snap) &&
+                                 !string.Equals(snap.SourceField, update.SourceField, StringComparison.OrdinalIgnoreCase))
+                        {
+                            await _auditLogging.AppendAuditEntryAsync(jobId, new Domain.Models.AuditEntry
+                            {
+                                Reviewer     = reviewer,
+                                ActionType   = Domain.Models.AuditActionType.MappingModified,
+                                WorkflowStep = "MappingConsolidation",
+                                TargetField  = update.TargetField,
+                                AiSuggested  = snap.SourceField,
+                                HumanChoice  = update.SourceField,
+                                AiConfidence = snap.Confidence,
+                                Notes        = $"Source changed from '{snap.SourceField}' to '{update.SourceField}'"
+                            });
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed writing mapping audit entries. JobId={JobId}", jobId);
+                }
+            }
 
             if (updated == 0 && deleted == 0)
             {
@@ -816,6 +888,29 @@ namespace DataReconciliation.Controllers
 
             await _artifactPersistence.PersistArtifactAsync(jobId, finalMapping, Domain.Enums.ArtifactType.FinalMappingConfig, "final_mapping_config.json");
             await _artifactPersistence.PersistArtifactAsync(jobId, valueMappingsDocument, Domain.Enums.ArtifactType.ValueMappings, "value_mappings.json");
+
+            // ── Audit: record value mapping review action ─────────────────────────
+            if (_auditLogging != null)
+            {
+                try
+                {
+                    var reviewer = (await _jobRepo.GetByJobIdAsync(jobId))?.ReviewerName ?? "System";
+                    await _auditLogging.AppendAuditEntryAsync(jobId, new Domain.Models.AuditEntry
+                    {
+                        Reviewer     = reviewer,
+                        ActionType   = Domain.Models.AuditActionType.ValueMappingAccepted,
+                        WorkflowStep = "TransformationExecution",
+                        TargetField  = request.TargetField,
+                        SourceField  = request.SourceField,
+                        HumanChoice  = $"{normalizedEntries.Count} rule(s) configured",
+                        Notes        = saveAsTemplate ? "Saved as template" : null
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed writing value mapping audit entry. JobId={JobId}", jobId);
+                }
+            }
 
             if (saveAsTemplate)
             {
@@ -1626,6 +1721,36 @@ namespace DataReconciliation.Controllers
                 "Transformation overrides saved and applied. JobId={JobId} Count={Count}",
                 jobId, request.Overrides.Count(o => !string.IsNullOrWhiteSpace(o.OverrideTransformation)));
 
+            // ── Audit: record transformation decisions ────────────────────────────
+            if (_auditLogging != null)
+            {
+                try
+                {
+                    var reviewer = (await _jobRepo.GetByJobIdAsync(jobId))?.ReviewerName ?? "System";
+                    foreach (var o in request.Overrides.Where(o => o.Status != "AI_Suggested"))
+                    {
+                        bool wasOverridden = !string.IsNullOrWhiteSpace(o.OverrideTransformation);
+                        await _auditLogging.AppendAuditEntryAsync(jobId, new Domain.Models.AuditEntry
+                        {
+                            Reviewer     = reviewer,
+                            ActionType   = wasOverridden
+                                           ? Domain.Models.AuditActionType.TransformationOverridden
+                                           : Domain.Models.AuditActionType.TransformationAccepted,
+                            WorkflowStep = "TransformationExecution",
+                            TargetField  = o.TargetField,
+                            SourceField  = o.SourceField,
+                            AiSuggested  = o.SuggestedTransformation,
+                            HumanChoice  = wasOverridden ? o.OverrideTransformation : o.SuggestedTransformation,
+                            AiConfidence = o.Confidence
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed writing transformation audit entries. JobId={JobId}", jobId);
+                }
+            }
+
             return Ok(new
             {
                 saved = request.Overrides.Count,
@@ -1738,6 +1863,137 @@ namespace DataReconciliation.Controllers
             });
         }
 
-}
+        // ═══════════════════════════════════════════════════════════════
+        // MAPPING WORKBENCH — Unmapped Source Fields
+        // ═══════════════════════════════════════════════════════════════
+
+        [HttpGet]
+        public async Task<IActionResult> GetUnmappedDecisions(string jobId)
+        {
+            if (string.IsNullOrWhiteSpace(jobId))
+                return BadRequest(new { error = "jobId is required." });
+
+            var path = await GetUnmappedDecisionsPathAsync(jobId);
+            if (path == null || !System.IO.File.Exists(path))
+                return Ok(new Dictionary<string, string>());
+
+            var json = await System.IO.File.ReadAllTextAsync(path);
+            var decisions = JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new Dictionary<string, string>();
+            return Ok(decisions);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveUnmappedDecisions(
+            [FromQuery] string jobId,
+            [FromBody] Dictionary<string, string> decisions)
+        {
+            if (string.IsNullOrWhiteSpace(jobId) || decisions == null)
+                return BadRequest(new { error = "jobId and decisions body are required." });
+
+            var path = await GetUnmappedDecisionsPathAsync(jobId, createDirectory: true);
+            if (path == null)
+                return StatusCode(500, new { error = "Could not resolve artifact path." });
+
+            await System.IO.File.WriteAllTextAsync(
+                path,
+                JsonSerializer.Serialize(decisions, new JsonSerializerOptions { WriteIndented = true }));
+
+            _logger.LogInformation("Unmapped field decisions saved. JobId={JobId} Count={Count}", jobId, decisions.Count);
+            return Ok(new { saved = decisions.Count });
+        }
+
+        private async Task<string?> GetUnmappedDecisionsPathAsync(string jobId, bool createDirectory = false)
+        {
+            var artifactsPath = await _fileIngestionService.GetWorkflowPathAsync(jobId, "artifacts");
+            if (createDirectory)
+                Directory.CreateDirectory(artifactsPath);
+            return Path.Combine(artifactsPath, "unmapped_decisions.json");
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // GOVERNANCE — Dashboard View
+        // ═══════════════════════════════════════════════════════════════
+
+        [HttpGet]
+        public async Task<IActionResult> GovernanceDashboard(string jobId)
+        {
+            if (string.IsNullOrWhiteSpace(jobId))
+                return RedirectToAction(nameof(Index));
+
+            var job = await _jobRepo.GetByJobIdAsync(jobId);
+            if (job == null) return NotFound();
+
+            var evaluation = _evaluationService != null
+                ? await _evaluationService.LoadEvaluationAsync(jobId)
+                : null;
+
+            var auditLog = _auditLogging != null
+                ? await _auditLogging.LoadAuditLogAsync(jobId)
+                : null;
+
+            var aiAudits = (await _aiAudit.GetByJobIdAsync(jobId)).ToList();
+
+            var runHistory = _evaluationService != null
+                ? await _evaluationService.LoadRunHistoryAsync(jobId)
+                : new Domain.Models.EvaluationRunHistory { JobId = jobId };
+
+            var vm = new DataReconciliation.Application.DTOs.GovernanceDashboardViewModel
+            {
+                JobId      = jobId,
+                JobName    = job.JobName,
+                Evaluation = evaluation,
+                AuditLog   = auditLog,
+                AiAudits   = aiAudits,
+                RunHistory = runHistory
+            };
+
+            return View(vm);
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // GOVERNANCE — Evaluation / KPI Endpoints
+        // ═══════════════════════════════════════════════════════════════
+
+        [HttpGet]
+        public async Task<IActionResult> GetEvaluation(string jobId)
+        {
+            if (string.IsNullOrWhiteSpace(jobId))
+                return BadRequest(new { error = "jobId is required." });
+
+            if (_evaluationService == null)
+                return StatusCode(500, new { error = "Evaluation service not available." });
+
+            var summary = await _evaluationService.LoadEvaluationAsync(jobId);
+            if (summary == null)
+                return NotFound(new { error = "No evaluation summary found. Run the workflow to generate one." });
+
+            return Json(summary);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RecomputeEvaluation(string jobId)
+        {
+            if (string.IsNullOrWhiteSpace(jobId))
+                return BadRequest(new { error = "jobId is required." });
+
+            if (_evaluationService == null)
+                return StatusCode(500, new { error = "Evaluation service not available." });
+
+            try
+            {
+                var summary = await _evaluationService.ComputeEvaluationAsync(jobId);
+                _logger.LogInformation("Evaluation recomputed on demand. JobId={JobId} Score={Score}", jobId, summary.MappingReadinessScore);
+                return Json(summary);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Recompute evaluation failed. JobId={JobId}", jobId);
+                return StatusCode(500, new { error = "Evaluation computation failed." });
+            }
+        }
+
+    }
 
 }

@@ -116,7 +116,10 @@ namespace DataReconciliation.Domain.Enums
         TransformationOverrides,
         AuditLog,
         TargetFile,
-        WorkflowLog
+        WorkflowLog,
+        EvaluationSummary,
+        GovernanceAuditLog,
+        EvaluationHistory
     }
 
     public enum ReconciliationStatus

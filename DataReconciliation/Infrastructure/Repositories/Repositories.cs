@@ -140,4 +140,68 @@ namespace DataReconciliation.Infrastructure.Repositories
                 .OrderByDescending(l => l.OccurredAt)
                 .ToListAsync();
     }
+
+    public class HistoricalMappingRepository : IHistoricalMappingRepository
+    {
+        private readonly AppDbContext _context;
+
+        public HistoricalMappingRepository(AppDbContext context) => _context = context;
+
+        public async Task<HistoricalMappingEntry?> GetByTargetFieldAsync(string targetField) =>
+            await _context.HistoricalMappings
+                .FirstOrDefaultAsync(e => e.TargetField == targetField);
+
+        public async Task<IEnumerable<HistoricalMappingEntry>> GetAllAsync(bool activeOnly = false)
+        {
+            var q = _context.HistoricalMappings.AsQueryable();
+            if (activeOnly) q = q.Where(e => e.IsActive);
+            return await q.OrderBy(e => e.TargetField).ToListAsync();
+        }
+
+        public async Task<HistoricalMappingEntry?> GetByIdAsync(int id) =>
+            await _context.HistoricalMappings.FindAsync(id);
+
+        public async Task<HistoricalMappingEntry> UpsertAsync(HistoricalMappingEntry entry)
+        {
+            var existing = await GetByTargetFieldAsync(entry.TargetField);
+            if (existing == null)
+            {
+                _context.HistoricalMappings.Add(entry);
+            }
+            else
+            {
+                // Upsert: update fields but preserve manual edits
+                existing.SourceField           = entry.SourceField;
+                existing.SourceDataset         = entry.SourceDataset;
+                existing.MatchSource           = entry.MatchSource;
+                existing.TransformationSummary = entry.TransformationSummary;
+                existing.LastJobId             = entry.LastJobId;
+                existing.LastReviewerName      = entry.LastReviewerName;
+                existing.LastUsedAt            = entry.LastUsedAt;
+                existing.UsageCount           += 1;
+                if (entry.Confidence > existing.Confidence)
+                    existing.Confidence = entry.Confidence;
+                _context.HistoricalMappings.Update(existing);
+            }
+            await _context.SaveChangesAsync();
+            return existing ?? entry;
+        }
+
+        public async Task<HistoricalMappingEntry> UpdateAsync(HistoricalMappingEntry entry)
+        {
+            _context.HistoricalMappings.Update(entry);
+            await _context.SaveChangesAsync();
+            return entry;
+        }
+
+        public async Task DeleteAsync(int id)
+        {
+            var entry = await _context.HistoricalMappings.FindAsync(id);
+            if (entry != null)
+            {
+                _context.HistoricalMappings.Remove(entry);
+                await _context.SaveChangesAsync();
+            }
+        }
+    }
 }

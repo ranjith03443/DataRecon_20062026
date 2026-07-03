@@ -27,6 +27,8 @@ namespace DataReconciliation.Application.Workflow
         private readonly IArtifactPersistenceService _artifactPersistence;
         private readonly IErrorAuditLogRepository _errorLog;
         private readonly IConfiguration _configuration;
+        private readonly IEvaluationService _evaluationService;
+        private readonly IAuditLoggingService _auditLoggingService;
 
         public WorkflowOrchestratorService(
             ILogger<WorkflowOrchestratorService> logger,
@@ -47,7 +49,9 @@ namespace DataReconciliation.Application.Workflow
             IReconciliationService reconciliation,
             IArtifactPersistenceService artifactPersistence,
             IErrorAuditLogRepository errorLog,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            IEvaluationService evaluationService,
+            IAuditLoggingService auditLoggingService)
         {
             _logger = logger;
             _jobRepo = jobRepo;
@@ -68,6 +72,8 @@ namespace DataReconciliation.Application.Workflow
             _artifactPersistence = artifactPersistence;
             _errorLog = errorLog;
             _configuration = configuration;
+            _evaluationService = evaluationService;
+            _auditLoggingService = auditLoggingService;
         }
 
         public async Task<WorkflowContext> StartWorkflowAsync(DatasetManifest manifest)
@@ -103,6 +109,8 @@ namespace DataReconciliation.Application.Workflow
                     _configuration["WorkflowStorage:BasePath"] ?? Path.Combine(Directory.GetCurrentDirectory(), "workflow"),
                     manifest.JobId)
             };
+
+            await _auditLoggingService.InitializeAuditLogAsync(manifest.JobId, manifest.ReviewerName);
 
             try
             {
@@ -476,7 +484,8 @@ namespace DataReconciliation.Application.Workflow
                     break;
 
                 case WorkflowStep.ReportingAuditGeneration:
-                    // Reports generated on demand via ReportGenerationService
+                    await _evaluationService.ComputeEvaluationAsync(context.JobId);
+                    context.ArtifactPaths["EvaluationSummary"] = "evaluation_summary.json";
                     context.ArtifactPaths["Reports"] = "reports/";
                     break;
             }

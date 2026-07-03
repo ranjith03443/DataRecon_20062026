@@ -51,6 +51,12 @@ class EmbeddingProviderFactory:
                 config_key="embedding_provider",
             )
 
+        elif provider_name == EmbeddingProviderType.LOCAL:
+            from app.infrastructure.providers.embeddings.local_embedding_provider import (
+                LocalEmbeddingProvider,
+            )
+            return LocalEmbeddingProvider()
+
         else:
             raise ConfigurationException(
                 f"Unknown embedding provider: '{provider_name}'. "

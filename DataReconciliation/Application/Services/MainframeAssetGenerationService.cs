@@ -177,15 +177,23 @@ namespace DataReconciliation.Application.Services
                 {
                     var aiResult = await cobolAiTask!;
                     if (aiResult == null || string.IsNullOrWhiteSpace(aiResult.GeneratedCode))
-                        throw new InvalidOperationException(
-                            "AI service did not return a COBOL program. " +
-                            "Please ensure the Python AI service is running, then try again. " +
-                            "Alternatively, switch AI Mode off to use static generation.");
-                    cobolContent = aiResult.GeneratedCode;
-                    result.CobolAiGenerated = true;
-                    _logger.LogInformation(
-                        "AI COBOL program received. JobId={JobId} Confidence={Confidence}",
-                        jobId, aiResult.Confidence);
+                    {
+                        _logger.LogWarning(
+                            "AI COBOL generation returned no content — using static skeleton. JobId={JobId}", jobId);
+                        cobolContent =
+                            "      * *** AI GENERATION FAILED — STATIC SKELETON USED                 ***\n" +
+                            "      * *** AI service returned no code. Review and complete all TODOs. ***\n" +
+                            BuildCobolSkeleton(safeRecord, safeApp, safePgm, fields, valueMappings, mappingLookup);
+                        result.CobolAiGenerated = false;
+                    }
+                    else
+                    {
+                        cobolContent = aiResult.GeneratedCode;
+                        result.CobolAiGenerated = true;
+                        _logger.LogInformation(
+                            "AI COBOL program received. JobId={JobId} Confidence={Confidence}",
+                            jobId, aiResult.Confidence);
+                    }
                 }
                 else
                 {
@@ -206,15 +214,20 @@ namespace DataReconciliation.Application.Services
                 {
                     var aiResult = await jclAiTask!;
                     if (aiResult == null || string.IsNullOrWhiteSpace(aiResult.GeneratedCode))
-                        throw new InvalidOperationException(
-                            "AI service did not return JCL. " +
-                            "Please ensure the Python AI service is running, then try again. " +
-                            "Alternatively, switch AI Mode off to use static generation.");
-                    jclContent = aiResult.GeneratedCode;
-                    result.JclAiGenerated = true;
-                    _logger.LogInformation(
-                        "AI JCL received. JobId={JobId} Confidence={Confidence}",
-                        jobId, aiResult.Confidence);
+                    {
+                        _logger.LogWarning(
+                            "AI JCL generation returned no content — using static skeleton. JobId={JobId}", jobId);
+                        jclContent = BuildJcl(safeJob, safePgm, safeRecord, position - 1);
+                        result.JclAiGenerated = false;
+                    }
+                    else
+                    {
+                        jclContent = aiResult.GeneratedCode;
+                        result.JclAiGenerated = true;
+                        _logger.LogInformation(
+                            "AI JCL received. JobId={JobId} Confidence={Confidence}",
+                            jobId, aiResult.Confidence);
+                    }
                 }
                 else
                 {

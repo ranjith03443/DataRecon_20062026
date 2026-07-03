@@ -90,7 +90,7 @@ _CODE_GEN_PROMPT_TYPES = {
     "generate_recon_cobol",
     "generate_recon_jcl",
 }
-_CODE_GEN_MAX_TOKENS = 8000
+_CODE_GEN_MAX_TOKENS = 16000  # Haiku caps at ~8192; Sonnet/Opus support up to 64K
 _DEFAULT_MAX_TOKENS  = 4000
 
 
@@ -447,6 +447,26 @@ class MainframeAgentService:
                     "confidence": 0.65,
                     "reasoning": "Response was raw COBOL/JCL — JSON wrapper was absent.",
                 }
+
+        # Pass 5: JSON was truncated mid-stream (output token limit hit).
+        # Extract whatever generatedCode was produced before the cut-off.
+        if data is None:
+            code_match = re.search(r'"generatedCode"\s*:\s*"((?:[^"\\]|\\.)*)', cleaned, re.DOTALL)
+            if code_match:
+                partial = code_match.group(1)
+                # Unescape JSON escape sequences present in the partial content
+                partial = partial.replace('\\n', '\n').replace('\\t', '\t') \
+                                 .replace('\\"', '"').replace('\\\\', '\\')
+                data = {
+                    "generatedCode": partial,
+                    "confidence": 0.55,
+                    "reasoning": "Partial COBOL recovered from truncated JSON (output token limit reached). "
+                                 "Switch mainframeAgentModel to claude-sonnet-4-6 for full programs.",
+                }
+                logger.bind(category=LogCategories.MAINFRAME_AI_AGENT).warning(
+                    f"[MainframeAgentService] Output truncated — partial COBOL recovered | "
+                    f"job_id={job_id} | recovered_chars={len(partial)}"
+                )
 
         if data is None:
             logger.bind(category=LogCategories.MAINFRAME_AI_AGENT).warning(

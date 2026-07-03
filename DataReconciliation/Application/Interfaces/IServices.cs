@@ -276,6 +276,51 @@ namespace DataReconciliation.Application.Interfaces
         AISettingsSaveResult Save(AISettingsDto dto);
         string GetPythonEnvPath();
     }
+
+    public interface IEvaluationService
+    {
+        Task<DataReconciliation.Domain.Models.EvaluationSummary> ComputeEvaluationAsync(string jobId);
+        Task<DataReconciliation.Domain.Models.EvaluationSummary?> LoadEvaluationAsync(string jobId);
+        Task<DataReconciliation.Domain.Models.EvaluationRunHistory> LoadRunHistoryAsync(string jobId);
+    }
+
+    public interface IAuditLoggingService
+    {
+        Task InitializeAuditLogAsync(string jobId, string reviewerName);
+        Task AppendAuditEntryAsync(string jobId, DataReconciliation.Domain.Models.AuditEntry entry);
+        Task<DataReconciliation.Domain.Models.GovernanceAuditLog?> LoadAuditLogAsync(string jobId);
+    }
+
+    public interface IHistoricalMappingRepository
+    {
+        Task<DataReconciliation.Domain.Entities.HistoricalMappingEntry?> GetByTargetFieldAsync(string targetField);
+        Task<IEnumerable<DataReconciliation.Domain.Entities.HistoricalMappingEntry>> GetAllAsync(bool activeOnly = false);
+        Task<DataReconciliation.Domain.Entities.HistoricalMappingEntry> UpsertAsync(DataReconciliation.Domain.Entities.HistoricalMappingEntry entry);
+        Task<DataReconciliation.Domain.Entities.HistoricalMappingEntry?> GetByIdAsync(int id);
+        Task<DataReconciliation.Domain.Entities.HistoricalMappingEntry> UpdateAsync(DataReconciliation.Domain.Entities.HistoricalMappingEntry entry);
+        Task DeleteAsync(int id);
+    }
+
+    public interface IHistoricalMappingService
+    {
+        Task ExportFromFinalMappingAsync(string jobId, DataReconciliation.Domain.Models.FinalMappingConfig finalMapping, string reviewerName);
+        Task<IEnumerable<DataReconciliation.Domain.Entities.HistoricalMappingEntry>> GetAllAsync(bool activeOnly = false, string? search = null);
+        Task<DataReconciliation.Domain.Entities.HistoricalMappingEntry?> GetByIdAsync(int id);
+        Task<DataReconciliation.Domain.Entities.HistoricalMappingEntry> UpdateAsync(int id, string? sourceField, string? notes, bool isActive);
+        Task DeleteAsync(int id);
+        Task<int> GetTotalCountAsync();
+    }
+
+    /// <summary>
+    /// Syncs confirmed historical mappings into the Python FastAPI ChromaDB vector store
+    /// so the RAG pipeline has populated context for semantic mapping inference.
+    /// Non-critical: failures are logged but never block workflow progression.
+    /// </summary>
+    public interface IRagSyncService
+    {
+        Task<int> SyncHistoricalMappingsAsync(IEnumerable<DataReconciliation.Domain.Entities.HistoricalMappingEntry> entries);
+        Task<int> SyncAllActiveHistoricalMappingsAsync();
+    }
 }
 
 namespace DataReconciliation.Application.Interfaces

@@ -53,7 +53,12 @@ class LLMProviderFactory:
                 category=LogCategories.LLM_CALL,
             )
             provider_name = fallback
-            model_config = None   # let the fallback provider use its own default config
+            # Load provider-specific model config so the fallback uses the correct
+            # model name and timeout (avoids inheriting e.g. gpt-4o-mini from the azure config).
+            if fallback == LLMProviderType.CLAUDE:
+                model_config = config.get_claude_model_config(task) or None
+            else:
+                model_config = None
 
         logger.info(
             f"[LLMProviderFactory] Creating provider | provider={provider_name} | task={task}",

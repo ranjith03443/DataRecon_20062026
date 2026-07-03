@@ -1,0 +1,23 @@
+PIC 9(9) — A 9-digit unsigned integer field. Used for identifiers like customer numbers and account numbers.
+PIC 9(9)V99 — A numeric field with 9 integer digits and 2 implied decimal places. Always divide by 100 to get the actual value. Common for monetary amounts.
+PIC 9(9)V99 COMP-3 — Packed decimal monetary field. Must be unpacked before processing. Each byte holds 2 digits; last nibble is sign (C=positive, D=negative).
+PIC X(n) — An alphanumeric character field of length n. Often has trailing spaces from fixed-width records that must be trimmed.
+PIC A(n) — An alphabetic-only field of length n. Same trimming rules as PIC X.
+PIC 9(8) — An 8-digit date field in YYYYMMDD format. Convert to YYYY-MM-DD ISO 8601 for target systems.
+PIC 9(6) — Could be a 6-digit date in YYMMDD format (adjust century) or a sort code in NNNNNN format.
+COMP or COMP-4 — Binary integer. A COMP PIC 9(4) is a 2-byte binary integer; PIC 9(9) is a 4-byte binary integer.
+COMP-1 — Single-precision floating point (4 bytes). Rare in financial mainframe files.
+COMP-2 — Double-precision floating point (8 bytes). Rare; prefer COMP-3 for monetary values.
+COMP-3 (Packed Decimal) — Most common for monetary and count fields. Packs 2 digits per byte. Length = ceil((n+1)/2) bytes for PIC 9(n).
+REDEFINES — A COBOL clause that maps a field over the same storage as a preceding field. Only one interpretation is active at a time (determined by RECORD-TYPE or discriminator field).
+OCCURS — Indicates a repeating array. PIC X(20) OCCURS 5 means five 20-byte fields stored consecutively. Flatten to separate fields in the target.
+88-level items — Condition names (boolean constants). Not actual data fields. Ignore in mapping.
+01/05 levels — Group-level items containing child fields. Map child 05/10 fields, not the group itself.
+FILLER — An unnamed field used for spacing or alignment. Always skip in mapping — no target equivalent.
+Fields ending in -NO usually map to ID or NUMBER target fields.
+Fields ending in -NM or -NAME usually map to NAME or DESCRIPTION target fields.
+Fields ending in -DT or -DATE usually map to DATE target fields requiring YYYYMMDD to YYYY-MM-DD conversion.
+Fields ending in -AMT or -AMOUNT usually map to monetary DECIMAL fields requiring divide-by-100 transformation.
+Fields ending in -CD or -CODE usually map to CODE or STATUS target fields.
+Fields ending in -CNT or -COUNT usually map to INTEGER count target fields.
+Fields starting with HDR- belong to the header record. Fields starting with TRL- belong to the trailer record.

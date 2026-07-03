@@ -4,8 +4,8 @@ environment: dev
 description: "Enterprise-grade Semantic Intelligence Microservice for Metadata-Driven Reconciliation"
 
 features:
-  enable_rag: false
-  enable_semantic_cache: false
+  enable_rag: true
+  enable_semantic_cache: true
   enable_ai_mapping: true
   enable_audit_logging: true
   enable_token_governance: true

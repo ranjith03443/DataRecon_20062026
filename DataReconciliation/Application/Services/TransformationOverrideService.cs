@@ -77,13 +77,28 @@ namespace DataReconciliation.Application.Services
             var overrideConfig = await _artifactPersistence.LoadArtifactAsync<TransformationOverrideConfig>(
                 jobId, ArtifactType.TransformationOverrides);
 
+            // Always load FinalMappingConfig so we can derive (or refresh) SuggestedTransformation.
+            // This corrects stale suggestions in already-saved override artifacts without
+            // discarding the user's OverrideTransformation or Status choices.
+            var finalMapping = await _artifactPersistence.LoadArtifactAsync<FinalMappingConfig>(
+                jobId, ArtifactType.FinalMappingConfig);
+
+            var mappingLookup = finalMapping?.Mappings?
+                .Where(m => !string.IsNullOrWhiteSpace(m.SourceField) && m.SourceField != "[UNRESOLVED]")
+                .GroupBy(m => m.TargetField, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase)
+                ?? new Dictionary<string, FinalMapping>(StringComparer.OrdinalIgnoreCase);
+
             if (overrideConfig != null)
             {
+                // Return saved overrides but refresh SuggestedTransformation from the current
+                // FinalMappingConfig so it reflects the actual applied transformation.
                 return overrideConfig.Overrides.Select(o => new TransformationOverrideDto
                 {
                     TargetField = o.TargetField,
                     SourceField = o.SourceField,
-                    SuggestedTransformation = o.SuggestedTransformation,
+                    SuggestedTransformation = DeriveSuggestedOp(mappingLookup, o.TargetField)
+                                              ?? o.SuggestedTransformation,
                     Confidence = o.Confidence,
                     OverrideTransformation = o.OverrideTransformation,
                     CustomExpression = o.CustomExpression,
@@ -91,33 +106,19 @@ namespace DataReconciliation.Application.Services
                 }).ToList();
             }
 
-            // Build from final mapping config if no overrides yet
-            var finalMapping = await _artifactPersistence.LoadArtifactAsync<FinalMappingConfig>(
-                jobId, ArtifactType.FinalMappingConfig);
-
             if (finalMapping == null)
                 return new List<TransformationOverrideDto>();
 
-            var overrides = finalMapping.Mappings
-                .Where(m => !string.IsNullOrWhiteSpace(m.SourceField) && m.SourceField != "[UNRESOLVED]")
-                .Select(m =>
+            var overrides = mappingLookup.Values
+                .Select(m => new TransformationOverrideDto
                 {
-                    var primaryTransform = m.Transformations
-                        .FirstOrDefault(t => !string.Equals(t.Operation, "FIXED_WIDTH_FORMATTING", StringComparison.OrdinalIgnoreCase)
-                            && !string.Equals(t.Operation, "HARDCODED_VALUE", StringComparison.OrdinalIgnoreCase));
-
-                    var suggestedOp = primaryTransform?.Operation ?? "DIRECT";
-
-                    return new TransformationOverrideDto
-                    {
-                        TargetField = m.TargetField,
-                        SourceField = m.SourceField,
-                        SuggestedTransformation = suggestedOp,
-                        Confidence = m.Confidence,
-                        OverrideTransformation = string.Empty,
-                        CustomExpression = null,
-                        Status = "AI_Suggested"
-                    };
+                    TargetField = m.TargetField,
+                    SourceField = m.SourceField,
+                    SuggestedTransformation = DeriveSuggestedOp(mappingLookup, m.TargetField) ?? "DIRECT",
+                    Confidence = m.Confidence,
+                    OverrideTransformation = string.Empty,
+                    CustomExpression = null,
+                    Status = "AI_Suggested"
                 })
                 .OrderBy(o => o.TargetField)
                 .ToList();
@@ -202,6 +203,28 @@ namespace DataReconciliation.Application.Services
                     "Transformation overrides applied to final mapping. JobId={JobId} Applied={Count}",
                     jobId, applied);
             }
+        }
+
+        /// <summary>
+        /// Derives the suggested operation for a target field from the current FinalMappingConfig.
+        /// Semantic transformations are preferred over structural (FIXED_WIDTH_FORMATTING).
+        /// If FIXED_WIDTH_FORMATTING is the only operation, it is returned rather than "DIRECT".
+        /// Returns null when the field is not found in the lookup.
+        /// </summary>
+        private static string? DeriveSuggestedOp(
+            Dictionary<string, FinalMapping> lookup, string targetField)
+        {
+            if (!lookup.TryGetValue(targetField, out var m))
+                return null;
+
+            var primary =
+                m.Transformations.FirstOrDefault(t =>
+                    !string.Equals(t.Operation, "FIXED_WIDTH_FORMATTING", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(t.Operation, "HARDCODED_VALUE", StringComparison.OrdinalIgnoreCase))
+                ?? m.Transformations.FirstOrDefault(t =>
+                    string.Equals(t.Operation, "FIXED_WIDTH_FORMATTING", StringComparison.OrdinalIgnoreCase));
+
+            return primary?.Operation ?? "DIRECT";
         }
 
         private static TransformationRule? BuildTransformationRule(string operation, string? customExpression)

@@ -88,7 +88,9 @@ class ChromaDBStore(IVectorStore):
             )
 
         doc_ids = ids or [str(uuid.uuid4()) for _ in documents]
-        doc_metadatas = metadatas or [{} for _ in documents]
+        raw_metadatas = metadatas or [{} for _ in documents]
+        # ChromaDB 0.5+ requires non-empty metadata dicts — add a sentinel if empty
+        doc_metadatas = [m if m else {"_src": "indexed"} for m in raw_metadatas]
 
         try:
             collection = self._get_collection(collection_name)

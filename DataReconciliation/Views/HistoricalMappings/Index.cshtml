@@ -1,0 +1,264 @@
+@model List<DataReconciliation.Domain.Entities.HistoricalMappingEntry>
+@{
+    ViewData["Title"] = "Historical Mappings";
+    string search     = ViewBag.Search as string ?? "";
+    bool activeOnly   = (bool)(ViewBag.ActiveOnly ?? false);
+    int total         = (int)(ViewBag.Total ?? 0);
+}
+
+<div class="d-flex align-items-center mb-4 gap-3">
+    <div>
+        <h2 class="mb-0"><i class="fas fa-history me-2 text-primary"></i>Historical Mappings</h2>
+        <div class="small text-muted mt-1">
+            Confirmed field mappings from completed workflows — <strong>@total</strong> total, <strong>@Model.Count</strong> shown
+        </div>
+    </div>
+    <div class="ms-auto d-flex gap-2">
+        <form asp-action="SyncToRag" method="post" class="d-inline"
+              onsubmit="return confirm('Sync all active mappings to the Knowledge Base? The Python AI service must be running.')">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-sm btn-outline-info">
+                <i class="fas fa-brain me-1"></i>Sync to Knowledge Base
+            </button>
+        </form>
+        <a asp-action="DownloadCsv" class="btn btn-sm btn-success">
+            <i class="fas fa-file-csv me-1"></i>Download for Workflow (CSV)
+        </a>
+        <a asp-controller="Workflow" asp-action="Create" class="btn btn-sm btn-primary">
+            <i class="fas fa-plus me-1"></i>New Workflow
+        </a>
+    </div>
+</div>
+
+<div class="alert alert-light border d-flex align-items-start gap-3 mb-3 py-2">
+    <i class="fas fa-circle-info text-primary mt-1"></i>
+    <div class="small">
+        <strong>How to use this file in a workflow:</strong>
+        Download the CSV → on the <em>New Workflow</em> page, upload it and assign the role
+        <strong>Historical Mappings</strong>. The deterministic mapping step will use it as a
+        reference — it is <strong>never applied automatically</strong> without your explicit upload.
+        Only <strong>active</strong> entries are included in the download.
+    </div>
+</div>
+
+@* ── Filter bar ────────────────────────────────────────────────────────────────── *@
+<form method="get" class="d-flex gap-2 mb-3 align-items-center">
+    <input type="text" name="search" value="@search" class="form-control form-control-sm"
+           style="max-width:280px" placeholder="Search target, source, notes…" />
+    <div class="form-check ms-1 mb-0">
+        <input class="form-check-input" type="checkbox" name="activeOnly" id="activeOnly"
+               value="true" @(activeOnly ? "checked" : "") onchange="this.form.submit()" />
+        <label class="form-check-label small" for="activeOnly">Active only</label>
+    </div>
+    <button type="submit" class="btn btn-sm btn-outline-primary">
+        <i class="fas fa-search me-1"></i>Filter
+    </button>
+    @if (!string.IsNullOrWhiteSpace(search) || activeOnly)
+    {
+        <a asp-action="Index" class="btn btn-sm btn-outline-secondary">Clear</a>
+    }
+</form>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>
+        No historical mappings found. They are auto-saved when you click <strong>Confirm &amp; Continue</strong> on a workflow.
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0" id="histTable">
+                <thead class="table-light">
+                    <tr>
+                        <th>Target Field</th>
+                        <th>Source Field</th>
+                        <th>Dataset</th>
+                        <th>Match Source</th>
+                        <th class="text-center">Conf.</th>
+                        <th>Transformations</th>
+                        <th class="text-center">Used</th>
+                        <th>Last Job</th>
+                        <th>Last Reviewer</th>
+                        <th>Last Used</th>
+                        <th>Notes</th>
+                        <th class="text-center">Active</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var e in Model)
+                    {
+                        <tr id="row-@e.Id" class="@(!e.IsActive ? "text-muted" : "")">
+                            <td class="fw-semibold small">@e.TargetField</td>
+                            <td class="small" id="sf-@e.Id">@e.SourceField</td>
+                            <td class="small text-muted">@(e.SourceDataset ?? "—")</td>
+                            <td class="small">
+                                @if (!string.IsNullOrWhiteSpace(e.MatchSource))
+                                {
+                                    string badgeColor = e.MatchSource.Contains("AI", StringComparison.OrdinalIgnoreCase) ? "info"
+                                        : e.MatchSource.Contains("Manual", StringComparison.OrdinalIgnoreCase) ? "warning"
+                                        : e.MatchSource.Contains("Hist", StringComparison.OrdinalIgnoreCase) ? "success"
+                                        : "secondary";
+                                    <span class="badge bg-@badgeColor">@e.MatchSource</span>
+                                }
+                                else { <span class="text-muted">—</span> }
+                            </td>
+                            <td class="text-center small">
+                                @{
+                                    string confCls = e.Confidence > 0.90 ? "text-success" : e.Confidence > 0.70 ? "text-warning" : "text-danger";
+                                }
+                                <span class="@confCls">@(e.Confidence > 0 ? e.Confidence.ToString("F2") : "—")</span>
+                            </td>
+                            <td class="small text-muted" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                                title="@e.TransformationSummary">
+                                @(string.IsNullOrWhiteSpace(e.TransformationSummary) ? "—" : e.TransformationSummary)
+                            </td>
+                            <td class="text-center fw-semibold">@e.UsageCount</td>
+                            <td class="small text-muted" style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                                title="@e.LastJobId">@(e.LastJobId ?? "—")</td>
+                            <td class="small">@(e.LastReviewerName ?? "—")</td>
+                            <td class="small text-muted text-nowrap">@e.LastUsedAt.ToString("yyyy-MM-dd")</td>
+                            <td class="small" id="notes-@e.Id" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                                title="@e.Notes">
+                                @if (string.IsNullOrWhiteSpace(e.Notes))
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                                else
+                                {
+                                    @e.Notes
+                                }
+                            </td>
+                            <td class="text-center">
+                                <button class="btn btn-link btn-sm p-0" onclick="toggleActive(@e.Id, @e.IsActive.ToString().ToLower())"
+                                        title="@(e.IsActive ? "Deactivate" : "Activate")">
+                                    <i class="fas fa-@(e.IsActive ? "toggle-on text-success" : "toggle-off text-muted") fa-lg"></i>
+                                </button>
+                            </td>
+                            <td class="text-center text-nowrap">
+                                <button class="btn btn-outline-primary btn-sm py-0 px-1"
+                                        onclick="openEditModal(@e.Id, '@Html.Raw(e.TargetField.Replace("'","\\'"  ))', '@Html.Raw((e.SourceField ?? "").Replace("'","\\'"  ))', '@Html.Raw((e.Notes ?? "").Replace("'","\\'"  ))', @e.IsActive.ToString().ToLower())"
+                                        title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <form asp-action="Delete" method="post" class="d-inline"
+                                      onsubmit="return confirm('Permanently delete this mapping entry?')">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@e.Id" />
+                                    <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-1" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@* ── Edit modal ────────────────────────────────────────────────────────────────── *@
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Edit Mapping</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editId" />
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small">Target Field</label>
+                    <input type="text" id="editTargetField" class="form-control form-control-sm" readonly />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small">Source Field</label>
+                    <input type="text" id="editSourceField" class="form-control form-control-sm"
+                           placeholder="e.g. CUST_NO" />
+                    <div class="form-text">Update the source field name if it changed in the new schema.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small">Notes</label>
+                    <textarea id="editNotes" class="form-control form-control-sm" rows="3"
+                              placeholder="Optional notes about this mapping…"></textarea>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="editIsActive" />
+                    <label class="form-check-label small" for="editIsActive">Active (included in deterministic matching)</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="saveEdit()">
+                    <i class="fas fa-save me-1"></i>Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    const antiForgeryToken = '@Html.AntiForgeryToken()'.match(/value="([^"]+)"/)?.[1] ?? '';
+
+    function openEditModal(id, targetField, sourceField, notes, isActive) {
+        document.getElementById('editId').value          = id;
+        document.getElementById('editTargetField').value = targetField;
+        document.getElementById('editSourceField').value = sourceField;
+        document.getElementById('editNotes').value        = notes;
+        document.getElementById('editIsActive').checked   = isActive;
+        new bootstrap.Modal(document.getElementById('editModal')).show();
+    }
+
+    async function saveEdit() {
+        const id         = document.getElementById('editId').value;
+        const sourceField = document.getElementById('editSourceField').value.trim();
+        const notes      = document.getElementById('editNotes').value.trim();
+        const isActive   = document.getElementById('editIsActive').checked;
+
+        try {
+            const resp = await fetch(`/HistoricalMappings/Update?id=${id}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': antiForgeryToken
+                },
+                body: JSON.stringify({ sourceField, notes, isActive })
+            });
+
+            if (!resp.ok) throw new Error(await resp.text());
+
+            const data = await resp.json();
+            // Update table row inline
+            const sfCell = document.getElementById(`sf-${id}`);
+            const noteCell = document.getElementById(`notes-${id}`);
+            const row = document.getElementById(`row-${id}`);
+            if (sfCell) sfCell.textContent = data.sourceField;
+            if (noteCell) noteCell.textContent = data.notes || '—';
+            if (row) row.classList.toggle('text-muted', !data.isActive);
+
+            bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+        } catch (err) {
+            alert('Save failed: ' + err.message);
+        }
+    }
+
+    async function toggleActive(id, currentlyActive) {
+        try {
+            const resp = await fetch(`/HistoricalMappings/Toggle?id=${id}`, {
+                method: 'POST',
+                headers: { 'RequestVerificationToken': antiForgeryToken }
+            });
+            if (!resp.ok) throw new Error(await resp.text());
+            // Reload to refresh toggle icon
+            window.location.reload();
+        } catch (err) {
+            alert('Toggle failed: ' + err.message);
+        }
+    }
+</script>
+}

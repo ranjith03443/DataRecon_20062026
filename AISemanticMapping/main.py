@@ -34,6 +34,7 @@ from app.api.routes import (
     value_mapping_agent_router,
     budget_router,
     multi_source_schema_router,
+    rag_builder_router,
 )
 from app.shared.constants.app_constants import AppConstants
 
@@ -121,6 +122,7 @@ def create_app() -> FastAPI:
     app.include_router(value_mapping_agent_router.router, prefix=api_prefix)
     app.include_router(budget_router.router, prefix=api_prefix)
     app.include_router(multi_source_schema_router.router, prefix=api_prefix)
+    app.include_router(rag_builder_router.router, prefix=api_prefix)
 
     logger.info(
         f"[AppFactory] FastAPI application configured | "

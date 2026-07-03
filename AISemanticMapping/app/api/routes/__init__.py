@@ -10,6 +10,7 @@ from app.api.routes import (
     value_mapping_agent_router,
     budget_router,
     multi_source_schema_router,
+    rag_builder_router,
 )
 
 __all__ = [
@@ -23,4 +24,5 @@ __all__ = [
     "value_mapping_agent_router",
     "budget_router",
     "multi_source_schema_router",
+    "rag_builder_router",
 ]

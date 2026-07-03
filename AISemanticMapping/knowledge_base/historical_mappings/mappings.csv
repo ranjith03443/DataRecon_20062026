@@ -1,0 +1,17 @@
+SOURCE_FIELD,TARGET_FIELD,TRANSFORMATION,CONFIDENCE,NOTES
+CUST_NO,CUSTOMER_ID,DIRECT,0.9800,Exact match — both are the primary customer numeric key
+CUST_NM,CUSTOMER_NAME,TRIM,0.9500,Source may have trailing spaces from fixed-width COBOL field
+ACCT_NO,ACCOUNT_NUMBER,PREFIX(ACC-) + FORMAT,0.9200,Add ACC- prefix and format as ACC-YYYY-NNNNN
+ACCT_BAL,ACCOUNT_BALANCE,DIVIDE(100),0.9700,Source is PIC 9(11)V99 COMP-3 packed decimal
+TXN_DT,TRANSACTION_DATE,DATE_FORMAT(YYYYMMDD -> YYYY-MM-DD),0.9600,Convert COBOL date to ISO format
+TXN_AMT,TRANSACTION_AMOUNT,DIVIDE(100),0.9500,Source stored as implied decimal PIC 9(9)V99
+TXN_CD,TRANSACTION_CODE,DIRECT,0.9000,Three-letter code maps directly
+STAT_CD,STATUS_CODE,DIRECT,0.8800,Single char status maps directly
+BRNCH_CD,BRANCH_CODE,LPAD(3,0),0.9100,Left-pad with zeros to ensure 3 digits
+SRT_CD,SORT_CODE,FORMAT(NN-NN-NN),0.9300,Insert hyphens every 2 digits
+EFF_DT,EFFECTIVE_DATE,DATE_FORMAT(YYYYMMDD -> YYYY-MM-DD),0.9400,COBOL date to ISO
+EXP_DT,EXPIRY_DATE,DATE_FORMAT(YYYYMMDD -> YYYY-MM-DD),0.9400,COBOL date to ISO
+REC_TYP,RECORD_TYPE,DIRECT,0.9800,HD/DT/TRL maps directly
+SEQ_NO,SEQUENCE_NUMBER,DIRECT,0.9600,Sequential counter maps directly
+TOT_RECS,TOTAL_RECORDS,DIRECT,0.9700,Trailer total record count maps directly
+CTL_AMT,CONTROL_AMOUNT,DIVIDE(100),0.9500,Trailer control amount needs decimal conversion

@@ -1,0 +1,26 @@
+TERM,EXPANSION,DEFINITION
+CUST,Customer,A person or business entity that purchases goods or services
+ACCT,Account,A financial record belonging to a customer
+AMT,Amount,A monetary value in the base currency (USD by default)
+DT,Date,A calendar date in YYYYMMDD or YYYY-MM-DD format
+NO,Number,A numeric identifier or count field
+ID,Identifier,A unique key used to identify a record
+CD,Code,A short alphanumeric code representing a category or status
+NM,Name,A text field containing a person or entity name
+ADDR,Address,A mailing or physical address
+ST,State,A two-letter US state abbreviation code
+ZIP,ZIP Code,A US postal code (5-digit or ZIP+4)
+ORIG,Original,The source or initial value before transformation
+TGT,Target,The destination field or system
+SEQ,Sequence,An ordered numeric position identifier
+BAL,Balance,The current outstanding monetary balance
+PIC,Picture Clause,A COBOL data definition specifying field length and type
+COMP,Computational,A COBOL binary or packed-decimal numeric storage format
+TRN,Transaction,A single business event or financial operation
+HDR,Header,The first record of a file containing metadata or control info
+TRL,Trailer,The last record of a file containing totals or control counts
+REC,Record,A single row or unit of data in a file
+FLD,Field,A single named column within a record
+XREF,Cross Reference,A lookup table mapping one code to another
+VALDT,Valid Date,The date from which a record or code becomes effective
+EXPDT,Expiry Date,The date after which a record or code is no longer valid

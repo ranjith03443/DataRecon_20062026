@@ -17,6 +17,11 @@ namespace DataReconciliation.Controllers
         private readonly IDatasetRegistrationService _datasetRegistration;
         private readonly ILogger<WorkflowController> _logger;
         private readonly IServiceScopeFactory _scopeFactory;
+        private readonly IConfiguration _configuration;
+        private readonly IArtifactPersistenceService? _artifactPersistence;
+        private readonly IAuditLoggingService? _auditLogging;
+        private readonly IHistoricalMappingService? _historicalMappings;
+        private readonly IRagSyncService? _ragSync;
 
         public WorkflowController(
             IWorkflowOrchestratorService orchestrator,
@@ -26,7 +31,12 @@ namespace DataReconciliation.Controllers
             IFileIngestionService fileIngestion,
             IDatasetRegistrationService datasetRegistration,
             ILogger<WorkflowController> logger,
-            IServiceScopeFactory scopeFactory)
+            IServiceScopeFactory scopeFactory,
+            IConfiguration configuration,
+            IArtifactPersistenceService? artifactPersistence = null,
+            IAuditLoggingService? auditLogging = null,
+            IHistoricalMappingService? historicalMappings = null,
+            IRagSyncService? ragSync = null)
         {
             _orchestrator = orchestrator;
             _jobRepo = jobRepo;
@@ -36,6 +46,11 @@ namespace DataReconciliation.Controllers
             _datasetRegistration = datasetRegistration;
             _logger = logger;
             _scopeFactory = scopeFactory;
+            _configuration = configuration;
+            _artifactPersistence = artifactPersistence;
+            _auditLogging = auditLogging;
+            _historicalMappings = historicalMappings;
+            _ragSync = ragSync;
         }
 
         [HttpGet]
@@ -91,12 +106,17 @@ namespace DataReconciliation.Controllers
                 return View(request);
             }
 
+            var reviewerName = !string.IsNullOrWhiteSpace(request.ReviewerName)
+                ? request.ReviewerName.Trim()
+                : _configuration["Governance:DefaultReviewerName"] ?? "System";
+
             var jobId = $"JOB_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid().ToString()[..6].ToUpperInvariant()}";
             var manifest = new DatasetManifest
             {
-                JobId = jobId,
-                JobName = request.JobName,
-                CreatedAt = DateTime.UtcNow
+                JobId        = jobId,
+                JobName      = request.JobName,
+                CreatedAt    = DateTime.UtcNow,
+                ReviewerName = reviewerName
             };
 
             // Ingest uploaded files
@@ -140,9 +160,10 @@ namespace DataReconciliation.Controllers
             // Pre-create the job record in DB so the Details page finds it immediately
             await _jobRepo.CreateAsync(new DataReconciliation.Domain.Entities.WorkflowJob
             {
-                JobId = jobId,
-                JobName = request.JobName,
-                Status = DataReconciliation.Domain.Enums.WorkflowStatus.Pending,
+                JobId        = jobId,
+                JobName      = request.JobName,
+                ReviewerName = reviewerName,
+                Status       = DataReconciliation.Domain.Enums.WorkflowStatus.Pending,
                 CorrelationId = Guid.NewGuid().ToString()
             });
 
@@ -266,9 +287,82 @@ namespace DataReconciliation.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult ConfirmMappings(string jobId)
+        public async Task<IActionResult> ConfirmMappings(string jobId)
         {
             _logger.LogInformation("Mapping approval confirmed. JobId={JobId}", jobId);
+
+            // ── Audit: record MAPPING_ACCEPTED for all AI-inferred fields the reviewer is confirming ──
+            if (_auditLogging != null && _artifactPersistence != null)
+            {
+                try
+                {
+                    var job          = await _jobRepo.GetByJobIdAsync(jobId);
+                    var finalMapping = await _artifactPersistence.LoadArtifactAsync<Domain.Models.FinalMappingConfig>(
+                        jobId, Domain.Enums.ArtifactType.FinalMappingConfig);
+
+                    if (finalMapping != null && job != null)
+                    {
+                        var reviewer = job.ReviewerName.Length > 0 ? job.ReviewerName : "System";
+                        foreach (var m in finalMapping.Mappings
+                            .Where(m => m.Status != Domain.Enums.MappingStatus.UNRESOLVED
+                                     && m.SourceField != "[UNRESOLVED]"
+                                     && (m.MatchSource == "AI Inference" || m.MatchSource == "historical"
+                                        || m.MatchSource == "exact_match")))
+                        {
+                            await _auditLogging.AppendAuditEntryAsync(jobId, new Domain.Models.AuditEntry
+                            {
+                                Reviewer     = reviewer,
+                                ActionType   = Domain.Models.AuditActionType.MappingAccepted,
+                                WorkflowStep = "MappingConsolidation",
+                                TargetField  = m.TargetField,
+                                SourceField  = m.SourceField,
+                                AiSuggested  = m.SourceField,
+                                HumanChoice  = m.SourceField,
+                                AiConfidence = m.Confidence,
+                                Notes        = $"Accepted at mapping confirmation ({m.MatchSource})"
+                            });
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed writing confirm-mapping audit entries. JobId={JobId}", jobId);
+                }
+            }
+
+            // ── Export confirmed mappings to historical store ───────────────────
+            if (_historicalMappings != null && _artifactPersistence != null)
+            {
+                try
+                {
+                    var job          = await _jobRepo.GetByJobIdAsync(jobId);
+                    var finalMapping = await _artifactPersistence.LoadArtifactAsync<Domain.Models.FinalMappingConfig>(
+                        jobId, Domain.Enums.ArtifactType.FinalMappingConfig);
+                    if (finalMapping != null)
+                        await _historicalMappings.ExportFromFinalMappingAsync(
+                            jobId, finalMapping, job?.ReviewerName ?? "System");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed exporting to historical mappings. JobId={JobId}", jobId);
+                }
+
+                // ── Sync to RAG vector store so future jobs benefit from this mapping ──
+                if (_ragSync != null)
+                {
+                    try
+                    {
+                        var synced = await _ragSync.SyncAllActiveHistoricalMappingsAsync();
+                        _logger.LogInformation(
+                            "RAG sync complete after mapping confirmation. Synced={Count} JobId={JobId}",
+                            synced, jobId);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "RAG sync failed after mapping confirmation (non-critical). JobId={JobId}", jobId);
+                    }
+                }
+            }
 
             var scopeFactory = _scopeFactory;
             _ = Task.Run(async () =>

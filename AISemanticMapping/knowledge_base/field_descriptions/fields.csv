@@ -1,0 +1,17 @@
+FIELD_NAME,DESCRIPTION,DATA_TYPE,EXAMPLE
+CUSTOMER_ID,Unique numeric identifier assigned to each customer at account creation,INTEGER,1000023
+CUSTOMER_NAME,Full legal name of the customer as registered in the system,VARCHAR,John Smith
+ACCOUNT_NUMBER,Alphanumeric account number assigned by the financial institution,VARCHAR,ACC-2024-00019
+ACCOUNT_BALANCE,Current outstanding balance on the account in USD with 2 decimal places,DECIMAL,1250.75
+TRANSACTION_DATE,The calendar date on which the transaction was posted in YYYY-MM-DD format,DATE,2024-03-15
+TRANSACTION_AMOUNT,The monetary value of the transaction. Positive = credit, Negative = debit,DECIMAL,500.00
+TRANSACTION_CODE,A three-letter code identifying the type of transaction (DEP/WDR/TRF/FEE),VARCHAR,DEP
+STATUS_CODE,Single character representing record status: A=Active, I=Inactive, P=Pending, C=Closed,CHAR,A
+BRANCH_CODE,Three-digit numeric code identifying the originating branch location,VARCHAR,042
+SORT_CODE,Six-digit bank sort code used for inter-bank routing in format NN-NN-NN,VARCHAR,10-20-30
+EFFECTIVE_DATE,The date from which this record version is valid in YYYYMMDD format,DATE,20240101
+EXPIRY_DATE,The date after which this record is no longer valid. NULL means no expiry,DATE,20991231
+RECORD_TYPE,Two-character COBOL record type identifier (HD=Header TR=Trailer DT=Detail),CHAR,DT
+SEQUENCE_NUMBER,Sequential record number within the file starting from 1,INTEGER,42
+TOTAL_RECORDS,Count of detail records between header and trailer,INTEGER,1500
+CONTROL_AMOUNT,Sum of all TRANSACTION_AMOUNT values used for file-level reconciliation,DECIMAL,750000.00

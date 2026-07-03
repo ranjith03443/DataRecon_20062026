@@ -17,6 +17,7 @@ namespace DataReconciliation.Domain.Entities
         public string CorrelationId { get; set; } = Guid.NewGuid().ToString();
         public bool IsReplay { get; set; } = false;
         public string? ReplayFromJobId { get; set; }
+        public string ReviewerName { get; set; } = string.Empty;
 
         public ICollection<WorkflowStepExecution> StepExecutions { get; set; } = new List<WorkflowStepExecution>();
         public ICollection<WorkflowArtifact> Artifacts { get; set; } = new List<WorkflowArtifact>();
@@ -95,5 +96,33 @@ namespace DataReconciliation.Domain.Entities
         public DateTime OccurredAt { get; set; } = DateTime.UtcNow;
         public string CorrelationId { get; set; } = string.Empty;
         public bool IsResolved { get; set; } = false;
+    }
+
+    public class HistoricalMappingEntry
+    {
+        public int Id { get; set; }
+
+        // ── Mapping identity (upsert key = TargetField) ───────────────────────
+        public string TargetField { get; set; } = string.Empty;
+        public string SourceField { get; set; } = string.Empty;
+        public string? SourceDataset { get; set; }
+
+        // ── Quality / provenance ──────────────────────────────────────────────
+        public double Confidence { get; set; }
+        public string? MatchSource { get; set; }
+        public string? TransformationSummary { get; set; }
+
+        // ── Usage tracking ────────────────────────────────────────────────────
+        public int UsageCount { get; set; } = 1;
+        public string? LastJobId { get; set; }
+        public string? LastReviewerName { get; set; }
+
+        // ── User-editable ──────────────────────────────────────────────────────
+        public string? Notes { get; set; }
+        public bool IsActive { get; set; } = true;
+
+        // ── Timestamps ────────────────────────────────────────────────────────
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime LastUsedAt { get; set; } = DateTime.UtcNow;
     }
 }

@@ -89,6 +89,9 @@ namespace DataReconciliation.Infrastructure.FileStorage
             ArtifactType.AuditLog => "audit_log.json",
             ArtifactType.WorkflowLog => "workflow_log.json",
             ArtifactType.TargetFile => "target_output.dat",
+            ArtifactType.EvaluationSummary => "evaluation_summary.json",
+            ArtifactType.GovernanceAuditLog => "governance_audit_log.json",
+            ArtifactType.EvaluationHistory => "evaluation_history.json",
             _ => $"{type.ToString().ToLowerInvariant()}.json"
         };
     }

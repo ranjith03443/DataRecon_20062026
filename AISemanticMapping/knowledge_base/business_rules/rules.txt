@@ -1,0 +1,15 @@
+TRANSACTION_AMOUNT must always be a non-zero value. Zero-amount transactions are rejected.
+ACCOUNT_NUMBER must follow the format ACC-YYYY-NNNNN where YYYY is the year and NNNNN is a 5-digit sequence.
+STATUS_CODE must be one of: A (Active), I (Inactive), P (Pending), C (Closed). Any other value is invalid.
+EFFECTIVE_DATE must be less than or equal to EXPIRY_DATE. Records where EFFECTIVE_DATE > EXPIRY_DATE are rejected.
+CUSTOMER_ID must be a positive integer. Negative values and zero are not valid customer identifiers.
+TRANSACTION_DATE cannot be a future date. Transactions must be posted on or before the current system date.
+SORT_CODE must match the pattern NN-NN-NN where N is a digit. Sort codes must exist in the branch reference table.
+CONTROL_AMOUNT in the trailer record must equal the sum of all TRANSACTION_AMOUNT values in detail records.
+TOTAL_RECORDS in the trailer must equal the exact count of detail (DT) records in the file.
+BRANCH_CODE must be exactly 3 numeric digits with leading zeros (e.g. 042 not 42).
+Fields with PIC 9(9)V99 COMP-3 format must be un-packed from packed decimal before mapping.
+Date fields in YYYYMMDD format must be converted to YYYY-MM-DD ISO format in the target system.
+Amount fields in COBOL PIC 9(11)V99 must be divided by 100 to get the decimal value.
+RECORD_TYPE must be HD for the first record, TRL for the last record, and DT for all records in between.
+Duplicate CUSTOMER_ID values within the same file are rejected — each customer appears once per file.

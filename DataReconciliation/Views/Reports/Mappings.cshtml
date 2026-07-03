@@ -3,9 +3,17 @@
     ViewData["Title"] = "Mapping Workbench";
     var jobId = ViewBag.JobId as string ?? "";
     var sourceFields = ViewBag.SourceFields as List<string> ?? new List<string>();
+    var sourceFieldsByDataset = ViewBag.SourceFieldsByDataset as Dictionary<string, string> ?? new Dictionary<string, string>();
     var valueMappingTemplates = ViewBag.ValueMappingTemplates as List<DataReconciliation.Application.DTOs.ValueMappingTemplateInfoDto> ?? new List<DataReconciliation.Application.DTOs.ValueMappingTemplateInfoDto>();
     var hasUploadedValueMappingSeed = ViewBag.HasUploadedValueMappingSeed as bool? ?? false;
     var uploadedValueMappingSeedName = ViewBag.UploadedValueMappingSeedName as string ?? "";
+    var mappedSourceFields = Model == null ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        : new HashSet<string>(
+            Model.Mappings.Select(m => m.SourceField)
+                .Concat(Model.Mappings.SelectMany(m => m.AdditionalSources.Select(a => a.SourceField)))
+                .Where(f => !string.IsNullOrEmpty(f) && f != "[UNRESOLVED]"),
+            StringComparer.OrdinalIgnoreCase);
+    var unmappedFields = sourceFields.Where(f => !mappedSourceFields.Contains(f)).OrderBy(f => sourceFieldsByDataset.GetValueOrDefault(f, "")).ThenBy(f => f).ToList();
 }
 
 <div class="d-flex align-items-center mb-3">
@@ -60,12 +68,20 @@ else
                     type="button" role="tab">
                 <i class="fas fa-magic me-1"></i>Transformations
                 <span class="badge bg-secondary ms-1">@Model.Mappings.Count(m => m.Transformations.Any(t => !string.Equals(t.Operation,"HARDCODED_VALUE",StringComparison.OrdinalIgnoreCase)))</span>
+                <span class="badge bg-warning text-dark ms-1 d-none" id="pendingReviewBadge" title="AI suggestions pending review"></span>
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="tab-reconciliation" data-bs-toggle="tab" data-bs-target="#pane-reconciliation"
                     type="button" role="tab">
                 <i class="fas fa-balance-scale me-1"></i>Reconciliation
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-unmapped" data-bs-toggle="tab" data-bs-target="#pane-unmapped"
+                    type="button" role="tab">
+                <i class="fas fa-question-circle me-1"></i>Unmapped Fields
+                <span class="badge bg-warning text-dark ms-1" id="unmappedBadge">@unmappedFields.Count</span>
             </button>
         </li>
     </ul>
@@ -617,7 +633,10 @@ else
                     <div class="d-flex align-items-center gap-2 flex-wrap">
                         <span id="overridesSaveStatus" class="small"></span>
                         <button type="button" class="btn btn-sm btn-outline-secondary" id="loadOverridesBtn">
-                            <i class="fas fa-sync me-1"></i>Load
+                            <i class="fas fa-sync me-1"></i>Refresh
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-success" id="acceptAllBtn">
+                            <i class="fas fa-check-double me-1"></i>Accept All AI Suggestions
                         </button>
                         <button type="button" class="btn btn-sm btn-primary" id="saveOverridesBtn">
                             <i class="fas fa-save me-1"></i>Save Overrides
@@ -727,6 +746,102 @@ else
             </div>
         </div>
 
+        <!-- ═══════════════════════════════════════════════════
+             TAB 5 – UNMAPPED SOURCE FIELDS
+        ════════════════════════════════════════════════════ -->
+        <div class="tab-pane fade" id="pane-unmapped" role="tabpanel">
+
+            <!-- KPI cards -->
+            <div class="row mb-3 g-2">
+                <div class="col-6 col-md-3">
+                    <div class="card text-center h-100"><div class="card-body py-2">
+                        <div class="fs-3 fw-bold">@sourceFields.Count</div>
+                        <div class="small text-muted">Total Source Fields</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card text-center h-100 border-success"><div class="card-body py-2">
+                        <div class="fs-3 fw-bold text-success">@mappedSourceFields.Count</div>
+                        <div class="small text-muted">Mapped</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card text-center h-100 border-warning"><div class="card-body py-2">
+                        <div class="fs-3 fw-bold text-warning" id="unmappedPendingCount">@unmappedFields.Count</div>
+                        <div class="small text-muted">Pending Decision</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card text-center h-100 border-secondary"><div class="card-body py-2">
+                        <div class="fs-3 fw-bold text-muted" id="unmappedExcludedCount">0</div>
+                        <div class="small text-muted">Intentionally Excluded</div>
+                    </div></div>
+                </div>
+            </div>
+
+            @if (!unmappedFields.Any())
+            {
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>All source fields are mapped to target fields. Nothing to review.
+                </div>
+            }
+            else
+            {
+                <div class="d-flex justify-content-between align-items-center mb-2 gap-2 flex-wrap">
+                    <p class="text-muted small mb-0">
+                        These source fields are not linked to any target field. Mark them as
+                        <strong>Intentionally Excluded</strong> (e.g. internal IDs, audit columns) so they are not flagged as gaps.
+                    </p>
+                    <div class="d-flex gap-2 flex-shrink-0">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="markAllExcludedBtn">
+                            <i class="fas fa-times-circle me-1"></i>Mark All Excluded
+                        </button>
+                        <button type="button" class="btn btn-sm btn-primary" id="saveUnmappedBtn">
+                            <i class="fas fa-save me-1"></i>Save Decisions
+                        </button>
+                        <span id="unmappedSaveStatus" class="small align-self-center"></span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Source Field</th>
+                                    <th>Dataset</th>
+                                    <th style="width:200px">Decision</th>
+                                    <th style="width:110px">Quick Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="unmappedFieldsTbody">
+                                @foreach (var field in unmappedFields)
+                                {
+                                    var dataset = sourceFieldsByDataset.GetValueOrDefault(field, "—");
+                                    <tr>
+                                        <td><code class="small">@field</code></td>
+                                        <td class="small text-muted">@dataset</td>
+                                        <td>
+                                            <select class="form-select form-select-sm unmapped-decision" data-field="@field">
+                                                <option value="PENDING">Pending Review</option>
+                                                <option value="EXCLUDED">Intentionally Excluded</option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <button type="button" class="btn btn-sm btn-outline-primary map-field-btn py-0 px-2">
+                                                <i class="fas fa-link me-1"></i>Map It
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+
+        </div>
+
     </div><!-- /tab-content -->
 
     <!-- ─── Generate Output File ──────────────────────────── -->
@@ -740,7 +855,7 @@ else
                     The <code>target_output.dat</code> will be available on the Workflow Details page.
                 </p>
             </div>
-            <form asp-controller="Reports" asp-action="GenerateFile" method="post" class="ms-3 flex-shrink-0">
+            <form asp-controller="Reports" asp-action="GenerateFile" method="post" class="ms-3 flex-shrink-0" id="generateFileForm">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="jobId" value="@jobId" />
                 <button type="submit" class="btn btn-success">
@@ -1824,6 +1939,14 @@ else
 
         document.getElementById('loadOverridesBtn')?.addEventListener('click', loadOverrides);
 
+        // Auto-load on tab activation (first visit only; Refresh button forces reload)
+        document.getElementById('tab-transformations')?.addEventListener('shown.bs.tab', () => {
+            if (!overrideData.length) loadOverrides();
+        });
+
+        // Silently preload on page load so the badge shows before user visits Tab 3
+        loadOverrides();
+
         async function loadOverrides() {
             const tbody = document.getElementById('overridesTbody');
             tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i>Loading…</td></tr>';
@@ -1844,6 +1967,7 @@ else
             tbody.innerHTML = '';
             if (!overrideData.length) {
                 tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No transformations found.</td></tr>';
+                updatePendingBadge(0);
                 return;
             }
             overrideData.forEach((o, i) => {
@@ -1884,6 +2008,19 @@ else
                 });
                 tbody.appendChild(tr);
             });
+
+            updatePendingBadge(overrideData.filter(o => o.status === 'AI_Suggested').length);
+        }
+
+        function updatePendingBadge(count) {
+            const badge = document.getElementById('pendingReviewBadge');
+            if (!badge) return;
+            if (count > 0) {
+                badge.textContent = count;
+                badge.classList.remove('d-none');
+            } else {
+                badge.classList.add('d-none');
+            }
         }
 
         document.getElementById('saveOverridesBtn')?.addEventListener('click', async () => {
@@ -1921,6 +2058,146 @@ else
                 if (statusEl) statusEl.innerHTML = `<span class="text-danger"><i class="fas fa-times-circle me-1"></i>Save failed: ${escHtml(e.message)}</span>`;
             }
             finally { btn.disabled = false; }
+        });
+
+        // Accept All AI Suggestions — marks every AI_Suggested row as Approved without changing operation
+        document.getElementById('acceptAllBtn')?.addEventListener('click', async () => {
+            if (!overrideData.length) await loadOverrides();
+            const btn = document.getElementById('acceptAllBtn');
+            btn.disabled = true;
+            const rows = [...document.getElementById('overridesTbody').querySelectorAll('tr')];
+            const overrides = overrideData.map((o, i) => {
+                const row = rows[i];
+                const sel = row?.querySelector('.override-select');
+                const expr = row?.querySelector('.override-expression');
+                return {
+                    ...o,
+                    overrideTransformation: sel?.value ?? '',
+                    customExpression: expr?.value ?? '',
+                    status: o.status === 'AI_Suggested' ? 'Approved' : o.status
+                };
+            });
+            try {
+                const res = await fetch(`@Url.Action("SaveTransformationOverrides","Reports")?jobId=${encodeURIComponent(JOB_ID)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': getCsrfToken() },
+                    body: JSON.stringify({ overrides })
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.error || `HTTP ${res.status}`);
+                }
+                const result = await res.json();
+                const statusEl = document.getElementById('overridesSaveStatus');
+                if (statusEl) statusEl.innerHTML = `<span class="text-success"><i class="fas fa-check-circle me-1"></i>All AI suggestions accepted — ${result.overridden} rule(s) saved.</span>`;
+                setTimeout(() => { if (statusEl) statusEl.innerHTML = ''; }, 5000);
+                await loadOverrides();
+            } catch (e) {
+                const statusEl = document.getElementById('overridesSaveStatus');
+                if (statusEl) statusEl.innerHTML = `<span class="text-danger"><i class="fas fa-times-circle me-1"></i>Accept failed: ${escHtml(e.message)}</span>`;
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        // ═══════════════════════════════════════════════════════════════
+        // TAB 5 — Unmapped Source Fields
+        // ═══════════════════════════════════════════════════════════════
+
+        let unmappedDecisions = {};
+        let unmappedLoaded = false;
+
+        document.getElementById('tab-unmapped')?.addEventListener('shown.bs.tab', () => {
+            if (!unmappedLoaded) loadUnmappedDecisions();
+        });
+
+        async function loadUnmappedDecisions() {
+            try {
+                const res = await fetch(`@Url.Action("GetUnmappedDecisions","Reports")?jobId=${JOB_ID}`);
+                if (!res.ok) return;
+                unmappedDecisions = await res.json();
+                applyUnmappedDecisions();
+                unmappedLoaded = true;
+            } catch {}
+        }
+
+        function applyUnmappedDecisions() {
+            document.querySelectorAll('.unmapped-decision').forEach(sel => {
+                const field = sel.dataset.field;
+                if (unmappedDecisions[field]) sel.value = unmappedDecisions[field];
+            });
+            updateUnmappedCounts();
+        }
+
+        function updateUnmappedCounts() {
+            const selects = [...document.querySelectorAll('.unmapped-decision')];
+            const excluded = selects.filter(s => s.value === 'EXCLUDED').length;
+            const pending = selects.filter(s => s.value === 'PENDING').length;
+            const pendingEl = document.getElementById('unmappedPendingCount');
+            const excludedEl = document.getElementById('unmappedExcludedCount');
+            const badgeEl = document.getElementById('unmappedBadge');
+            if (pendingEl) pendingEl.textContent = pending;
+            if (excludedEl) excludedEl.textContent = excluded;
+            if (badgeEl) badgeEl.textContent = pending;
+        }
+
+        document.querySelectorAll('.unmapped-decision').forEach(sel => {
+            sel.addEventListener('change', updateUnmappedCounts);
+        });
+
+        document.getElementById('markAllExcludedBtn')?.addEventListener('click', () => {
+            document.querySelectorAll('.unmapped-decision').forEach(sel => { sel.value = 'EXCLUDED'; });
+            updateUnmappedCounts();
+        });
+
+        document.getElementById('saveUnmappedBtn')?.addEventListener('click', async () => {
+            const btn = document.getElementById('saveUnmappedBtn');
+            const statusEl = document.getElementById('unmappedSaveStatus');
+            btn.disabled = true;
+            statusEl.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving…';
+            const decisions = {};
+            document.querySelectorAll('.unmapped-decision').forEach(sel => {
+                decisions[sel.dataset.field] = sel.value;
+            });
+            try {
+                const res = await fetch(`@Url.Action("SaveUnmappedDecisions","Reports")?jobId=${encodeURIComponent(JOB_ID)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': getCsrfToken() },
+                    body: JSON.stringify(decisions)
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                unmappedDecisions = decisions;
+                statusEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Saved.</span>';
+                setTimeout(() => { statusEl.innerHTML = ''; }, 3000);
+            } catch (e) {
+                statusEl.innerHTML = `<span class="text-danger"><i class="fas fa-times-circle me-1"></i>${escHtml(e.message)}</span>`;
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        document.querySelectorAll('.map-field-btn').forEach(btn => {
+            btn.addEventListener('click', () => { document.getElementById('tab-structural')?.click(); });
+        });
+
+        // Initialize counts immediately (before user visits the tab)
+        updateUnmappedCounts();
+
+        // Gate: warn before generating if transformation rules haven't been reviewed
+        document.getElementById('generateFileForm')?.addEventListener('submit', function (e) {
+            const unreviewed = overrideData.length === 0
+                ? -1
+                : overrideData.filter(o => o.status === 'AI_Suggested').length;
+            if (unreviewed === 0) return; // all reviewed — proceed
+            e.preventDefault();
+            const msg = unreviewed === -1
+                ? 'Transformation rules have not been reviewed yet.\n\nClick OK to generate anyway, or Cancel to review them in the Transformations tab first.'
+                : `${unreviewed} AI-suggested transformation rule(s) are still pending review.\n\nClick OK to generate anyway, or Cancel to review them first.`;
+            if (window.confirm(msg)) {
+                this.submit();
+            } else {
+                document.getElementById('tab-transformations')?.click();
+            }
         });
 
     })();

@@ -1,0 +1,208 @@
+@model Dictionary<string, object>
+@{
+    ViewData["Title"] = "Knowledge Base";
+
+    // Parse status from model (null = Python service offline)
+    bool serviceOnline = Model != null;
+    var collections = new Dictionary<string, (int Count, bool Ready)>();
+
+    if (serviceOnline && Model!.TryGetValue("collections", out var colsRaw))
+    {
+        try
+        {
+            var colsJson = colsRaw?.ToString() ?? "{}";
+            var colsDict = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, object>>>(colsJson);
+            if (colsDict != null)
+            {
+                foreach (var kv in colsDict)
+                {
+                    int count = kv.Value.TryGetValue("count", out var c) ? Convert.ToInt32(c) : 0;
+                    bool ready = kv.Value.TryGetValue("ready", out var r) && Convert.ToBoolean(r);
+                    collections[kv.Key] = (count, ready);
+                }
+            }
+        }
+        catch { /* ignore parse errors */ }
+    }
+
+    var folderMap = new Dictionary<string, (string Folder, string FileFormat, string Example)>
+    {
+        ["semantic_glossary"]   = ("glossary/",            "glossary.csv",  "TERM, EXPANSION, DEFINITION"),
+        ["field_descriptions"]  = ("field_descriptions/",  "fields.csv",    "FIELD_NAME, DESCRIPTION, DATA_TYPE, EXAMPLE"),
+        ["business_rules"]      = ("business_rules/",      "rules.txt",     "One rule per line"),
+        ["historical_mappings"] = ("historical_mappings/", "mappings.csv",  "SOURCE_FIELD, TARGET_FIELD, TRANSFORMATION, CONFIDENCE, NOTES"),
+        ["mainframe_patterns"]  = ("mainframe_patterns/",  "patterns.txt",  "One COBOL pattern per line"),
+        ["onboarding_metadata"] = ("onboarding/",          "context.txt",   "Free text, paragraphs separated by blank lines"),
+        ["target_schema"]       = ("—",                    "—",             "Auto-populated by future schema indexing"),
+    };
+}
+
+<div class="d-flex align-items-start mb-4 gap-3">
+    <div>
+        <h2 class="mb-0"><i class="fas fa-brain me-2 text-primary"></i>Knowledge Base</h2>
+        <div class="small text-muted mt-1">
+            Manage the domain knowledge that guides AI field mapping decisions
+        </div>
+    </div>
+    <div class="ms-auto">
+        @if (serviceOnline)
+        {
+            <form asp-action="Build" method="post" class="d-inline"
+                  onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').innerHTML='<i class=\'fas fa-spinner fa-spin me-1\'></i>Building…'">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-database me-1"></i>Build Knowledge Base
+                </button>
+            </form>
+        }
+        else
+        {
+            <button class="btn btn-outline-secondary" disabled>
+                <i class="fas fa-circle-exclamation me-1"></i>Python Service Offline
+            </button>
+        }
+    </div>
+</div>
+
+@* ── Service status banner ─────────────────────────────────────────────────── *@
+@if (!serviceOnline)
+{
+    <div class="alert alert-warning d-flex align-items-start gap-3">
+        <i class="fas fa-triangle-exclamation mt-1 fa-lg"></i>
+        <div>
+            <strong>Python AI service is not reachable.</strong>
+            Collection status cannot be loaded and builds cannot run.<br/>
+            <span class="small text-muted">Start the Python service (<code>cd AISemanticMapping &amp;&amp; python main.py</code>) and refresh this page.</span>
+        </div>
+    </div>
+}
+
+@* ── How it works ─────────────────────────────────────────────────────────────*@
+<div class="card mb-4 border-0 bg-light">
+    <div class="card-body py-3 px-4">
+        <h6 class="fw-semibold mb-2"><i class="fas fa-circle-info me-2 text-primary"></i>How to feed knowledge to the AI</h6>
+        <ol class="mb-0 small">
+            <li>Copy your files into the matching subfolder inside <code>AISemanticMapping/knowledge_base/</code> (see table below).</li>
+            <li>Click <strong>Build Knowledge Base</strong> — the service reads every file in every subfolder and indexes it.</li>
+            <li>You can add more files and rebuild any time. Existing entries are <strong>upserted</strong> (no duplicates).</li>
+            <li>After building, the AI will use this knowledge as context when inferring field mappings.</li>
+        </ol>
+    </div>
+</div>
+
+@* ── Collection status cards ──────────────────────────────────────────────────*@
+<div class="row g-3 mb-4">
+    @foreach (var col in folderMap)
+    {
+        bool hasStatus = collections.ContainsKey(col.Key);
+        int count = hasStatus ? collections[col.Key].Count : 0;
+        bool ready = hasStatus && collections[col.Key].Ready;
+        string cardBorder = !serviceOnline ? "border-secondary" : ready ? "border-success" : "border-warning";
+        string iconColor  = !serviceOnline ? "text-secondary" : ready ? "text-success" : "text-warning";
+        string icon       = !serviceOnline ? "circle-question" : ready ? "circle-check" : "circle-exclamation";
+
+        <div class="col-md-6 col-xl-4">
+            <div class="card h-100 border @cardBorder">
+                <div class="card-body py-3 px-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="fas fa-@icon @iconColor"></i>
+                        <span class="fw-semibold small">@col.Key</span>
+                        @if (serviceOnline)
+                        {
+                            <span class="badge ms-auto @(ready ? "bg-success" : "bg-warning text-dark")">
+                                @(ready ? $"{count} docs" : "empty")
+                            </span>
+                        }
+                    </div>
+                    <div class="small text-muted">
+                        @if (col.Value.Folder != "—")
+                        {
+                            <div>
+                                <i class="fas fa-folder-open me-1"></i>
+                                <code class="text-body">knowledge_base/@col.Value.Folder</code>
+                            </div>
+                            <div class="mt-1">
+                                <i class="fas fa-file me-1"></i>
+                                File: <code class="text-body">@col.Value.FileFormat</code>
+                            </div>
+                            <div class="mt-1 text-muted" style="font-size:0.78rem">
+                                Columns: @col.Value.Example
+                            </div>
+                        }
+                        else
+                        {
+                            <span class="fst-italic">@col.Value.Example</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@* ── File format reference ────────────────────────────────────────────────────*@
+<div class="card">
+    <div class="card-header py-2 bg-white">
+        <h6 class="mb-0 fw-semibold"><i class="fas fa-table me-2 text-muted"></i>File Format Reference</h6>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Subfolder</th>
+                    <th>File type</th>
+                    <th>Required columns / format</th>
+                    <th>Example row</th>
+                </tr>
+            </thead>
+            <tbody class="small">
+                <tr>
+                    <td><code>glossary/</code></td>
+                    <td>CSV</td>
+                    <td><code>TERM, EXPANSION, DEFINITION</code></td>
+                    <td class="text-muted">CUST, Customer, A person who purchases goods or services</td>
+                </tr>
+                <tr>
+                    <td><code>field_descriptions/</code></td>
+                    <td>CSV</td>
+                    <td><code>FIELD_NAME, DESCRIPTION, DATA_TYPE, EXAMPLE</code></td>
+                    <td class="text-muted">CUSTOMER_ID, Unique numeric customer key, INTEGER, 1000023</td>
+                </tr>
+                <tr>
+                    <td><code>business_rules/</code></td>
+                    <td>TXT</td>
+                    <td>One rule per line</td>
+                    <td class="text-muted">AMOUNT must be positive and non-zero.</td>
+                </tr>
+                <tr>
+                    <td><code>historical_mappings/</code></td>
+                    <td>CSV</td>
+                    <td><code>SOURCE_FIELD, TARGET_FIELD, TRANSFORMATION, CONFIDENCE, NOTES</code></td>
+                    <td class="text-muted">CUST_NO, CUSTOMER_ID, DIRECT, 0.9800, Primary key</td>
+                </tr>
+                <tr>
+                    <td><code>mainframe_patterns/</code></td>
+                    <td>TXT</td>
+                    <td>One COBOL pattern per line</td>
+                    <td class="text-muted">PIC 9(9)V99 COMP-3 — packed decimal; divide by 100</td>
+                </tr>
+                <tr>
+                    <td><code>onboarding/</code></td>
+                    <td>TXT</td>
+                    <td>Free text. Separate paragraphs with a blank line.</td>
+                    <td class="text-muted">Source is a COBOL mainframe batch file received daily…</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="alert alert-light border mt-3 d-flex gap-2 align-items-start small py-2">
+    <i class="fas fa-lightbulb text-warning mt-1"></i>
+    <div>
+        <strong>Tip:</strong> You can have <em>multiple files</em> per subfolder — all CSVs and TXTs in each folder are loaded.
+        Name them descriptively: <code>customer_glossary.csv</code>, <code>product_rules.txt</code>, etc.
+        The <strong>historical_mappings/</strong> folder accepts the same CSV you download from the
+        <a asp-controller="HistoricalMappings" asp-action="Index">Hist. Mappings</a> page — just copy it there and rebuild.
+    </div>
+</div>

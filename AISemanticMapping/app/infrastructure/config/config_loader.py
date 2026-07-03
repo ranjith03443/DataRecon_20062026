@@ -96,6 +96,10 @@ class AppConfig:
         """Get model configuration for a specific task."""
         return self._models.get("models", {}).get(task, {})
 
+    def get_claude_model_config(self, task: str) -> Optional[Dict[str, Any]]:
+        """Get Claude-specific model config from the claude_models section. Returns None if not found."""
+        return self._models.get("claude_models", {}).get(task) or None
+
     def get_embedding_model_config(self, model_key: str = "default") -> Dict[str, Any]:
         return self._models.get("embedding_models", {}).get(model_key, {})
 

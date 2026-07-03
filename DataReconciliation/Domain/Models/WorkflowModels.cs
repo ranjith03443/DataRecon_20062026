@@ -33,6 +33,7 @@ namespace DataReconciliation.Domain.Models
         public string? TargetParameterFilePath { get; set; }
         /// <summary>Optional path to ingested value-mapping seed Excel file (.xlsx/.xls).</summary>
         public string? ValueMappingsExcelFilePath { get; set; }
+        public string ReviewerName { get; set; } = string.Empty;
     }
 
     public class DatasetRegistration

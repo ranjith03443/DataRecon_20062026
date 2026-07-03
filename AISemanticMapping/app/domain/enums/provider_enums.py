@@ -20,6 +20,7 @@ class EmbeddingProviderType(str, Enum):
     AZURE_OPENAI = "azure_openai"
     OPENAI = "openai"
     HUGGINGFACE = "huggingface"
+    LOCAL = "local"
 
 
 class VectorStoreProviderType(str, Enum):
