@@ -118,7 +118,8 @@ namespace DataReconciliation.Application.Services
             CanonicalMappingConfig config)
         {
             var canonicalRecords = new List<CanonicalRecord>();
-            var primaryDatasetId = sourceData.Keys.First();
+            // Choose the primary dataset as the one with the most records (robust for typical ingestion ordering)
+            var primaryDatasetId = sourceData.OrderByDescending(kv => kv.Value?.Count ?? 0).First().Key;
             var primaryRecords = sourceData[primaryDatasetId];
             int rowIndex = 0;
 

@@ -13,6 +13,7 @@ namespace DataReconciliation.Application.Services
         private static readonly HashSet<string> CommonJoinKeys = new(StringComparer.OrdinalIgnoreCase)
         {
             "CUSTOMER_ID", "CUST_ID", "CLIENT_ID", "ACCOUNT_ID", "ACCT_ID",
+            "ACCT_NUM", "CUST_NUM", "CUSTOMER_NO", "ACCOUNT_NO",
             "LOAN_ID", "LOAN_NO", "CONTRACT_NO", "POLICY_ID", "EMPLOYEE_ID",
             "ORDER_ID", "TRANSACTION_ID", "RECORD_ID", "ID"
         };
@@ -83,7 +84,8 @@ namespace DataReconciliation.Application.Services
                 var isLikelyKey = CommonJoinKeys.Contains(field) ||
                                   field.EndsWith("_ID", StringComparison.OrdinalIgnoreCase) ||
                                   field.EndsWith("_NO", StringComparison.OrdinalIgnoreCase) ||
-                                  field.EndsWith("_KEY", StringComparison.OrdinalIgnoreCase);
+                                  field.EndsWith("_KEY", StringComparison.OrdinalIgnoreCase) ||
+                                  field.EndsWith("_NUM", StringComparison.OrdinalIgnoreCase);
 
                 if (isLikelyKey)
                 {
